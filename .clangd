@@ -1,0 +1,38 @@
+
+
+CompileFlags:
+  CompilationDatabase: build
+
+  Remove: [
+    "-mlongcalls",
+    "-mdisable-hardware-atomics",
+    "-fstrict-volatile-bitfields",
+    "-fno-tree-switch-conversion",
+    "-fzero-init-padding-bits=*",
+    "-fno-malloc-dce",
+    "-fno-shrink-wrap"
+  ]
+
+  Add: [
+    # 🔥 Critical: project config
+    "-include", "build/config/sdkconfig.h",
+
+    # 🔥 ESP-IDF core defines (adjust if not ESP32)
+    "-DIDF_VER=\"v6.0\"",
+    "-DESP_PLATFORM",
+    "-D_GNU_SOURCE",
+
+    # 🔥 Target (IMPORTANT)
+    "-DIDF_TARGET_ESP32S3",
+    "-DIDF_TARGET=\"esp32s3\"",
+
+    # 🔥 Fix FreeRTOS
+    "-include", "freertos/FreeRTOS.h",
+
+    # 🔥 Build includes
+    "-Ibuild",
+    "-Ibuild/esp-idf"
+  ]
+
+Index:
+  Background: Build

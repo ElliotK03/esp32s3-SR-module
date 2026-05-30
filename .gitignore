@@ -1,0 +1,114 @@
+
+# whitelist
+# !main
+
+
+# -------------------------------------------------
+# ESP‑IDF project – generated / temporary files
+# -------------------------------------------------
+
+# Build output (created by idf.py build)
+build/
+**/build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+# sdkconfig
+# sdkconfig.old
+sdkconfig.defaults
+sdkconfig.defaults.old
+# sdkconfig.defaults.esp32s3
+sdkconfig.defaults.esp32p4
+sdkconfig.defaults.esp32
+sdkconfig.defaults.esp32c3
+sdkconfig.defaults.esp32c2
+sdkconfig.defaults.esp32c6
+sdkconfig.defaults.esp32h2
+
+# IDF generated files
+*.bin
+*.elf
+*.map
+*.hex
+*.out
+*.log
+*.pyc
+__pycache__/
+managed_components/
+*.d
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+*.pyc
+*.pyo
+
+# Flash and partition tables
+partition_table/
+partitions.bin
+bootloader/
+bootloader.bin
+bootloader.elf
+
+# Flash tool output
+flash_args.json
+flash_args.bin
+
+# ESP‑IDF specific temporary files
+*.json
+*.log
+*.tmp
+*.swp
+*.swo
+*.swd
+
+# -------------------------------------------------
+# IDE / editor specific files
+# -------------------------------------------------
+.vscode/
+.idea/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+
+# Eclipse / VSCode / CLion caches
+.cmake/
+.cproject
+.project
+.settings/
+*.iml
+*.iws
+*.ipr
+
+# MacOS / Linux / Windows system files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.swp
+*~
+$RECYCLE.BIN/
+*.tmp
+
+# -------------------------------------------------
+# Python virtual environment (if you use one)
+# -------------------------------------------------
+venv/
+env/
+.venv/
+__pycache__/
+pip-wheel-metadata/
+pip-selfcheck.json
+
+# Unrelated boards
+components/hardware_driver/boards/esp32-*/
+components/hardware_driver/boards/esp32s3-*/
+components/hardware_driver/boards/esp32p4-*/
+components/hardware_driver/boards/include/**
+!components/hardware_driver/boards/esp32s3-custom/
+!components/hardware_driver/boards/include/bsp_board.h
+!components/hardware_driver/boards/include/esp32s3_custom_board.h
