@@ -8,6 +8,9 @@
 #ifndef _SPEECH_COMMANDS_ACTION_H_
 #define _SPEECH_COMMANDS_ACTION_H_
 
+#include "led_strip_types.h"
+
+led_strip_handle_t configure_led(void);
 void led_Task(void *arg);
 
 void speech_commands_action(int command_id);

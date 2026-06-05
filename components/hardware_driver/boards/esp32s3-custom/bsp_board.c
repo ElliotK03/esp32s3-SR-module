@@ -1,4 +1,7 @@
 #include "bsp_board.h"
+#include "esp32s3_custom_board_api.h"
+// #include "esp_codec_dev.h"
+#include "reent.h"
 #include "string.h"
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #include "driver/i2s_std.h"
@@ -9,7 +12,9 @@
 #endif
 // #include "driver/gpio.h"
 #include "driver/i2c_master.h"
-// #include "esp_check.h"
+#include "esp_codec_dev.h"
+#include "esp_codec_dev_defaults.h"
+// #include "esp_codec_dev_os.h"// #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
 // #include "esp_rom_sys.h"
@@ -45,8 +50,14 @@ static audio_codec_data_if_t *codec_data_if = NULL;
 static audio_codec_ctrl_if_t *codec_ctrl_if = NULL;
 static audio_codec_gpio_if_t *codec_gpio_if = NULL;
 static audio_codec_if_t *codec_if = NULL;
-static esp_codec_dev_handle_t codec_dev = NULL;
+esp_codec_dev_handle_t codec_dev = NULL;
 static i2c_master_bus_handle_t i2c_bus_handle = NULL;
+
+static esp_codec_dev_sample_info_t fs = {
+      .bits_per_sample = 0u,
+      .sample_rate = 0u,
+      .channel = 0u,
+  };
 
 esp_err_t bsp_i2c_init(i2c_port_t i2c_num, uint32_t clk_speed) {
 
@@ -158,7 +169,7 @@ static esp_err_t bsp_codec_init(int adc_sample_rate, int dac_sample_rate,
   codec_data_if = audio_codec_new_i2s_data(&i2s_cfg);
 
   audio_codec_i2c_cfg_t i2c_cfg = {
-      .addr = 0x30,
+      .addr = 0x30, // Verified on pulseview: It tries to use (.addr >> 1) as I2C address
       .bus_handle = i2c_bus_handle,
   };
   codec_ctrl_if = audio_codec_new_i2c_ctrl(&i2c_cfg);
@@ -180,11 +191,13 @@ static esp_err_t bsp_codec_init(int adc_sample_rate, int dac_sample_rate,
   };
   codec_dev = esp_codec_dev_new(&dev_cfg);
 
-  esp_codec_dev_sample_info_t fs = {
+  esp_codec_dev_sample_info_t dummy = {
       .bits_per_sample = dac_bits_per_chan,
       .sample_rate = dac_sample_rate,
       .channel = dac_channel_format,
   };
+  fs = dummy;
+  
   esp_codec_dev_set_in_gain(codec_dev, RECORD_VOLUME);
   esp_codec_dev_set_out_vol(codec_dev, PLAYER_VOLUME);
   esp_codec_dev_open(codec_dev, &fs);
@@ -227,6 +240,15 @@ static esp_err_t bsp_codec_deinit() {
   return ret_val;
 }
 
+esp_err_t bsp_codec_resume() {
+    return esp_codec_dev_open(codec_dev, &fs);
+}
+
+esp_err_t bsp_codec_suspend()
+{
+  return esp_codec_dev_close(codec_dev);
+}
+
 esp_err_t bsp_audio_play(const int16_t *data, int length,
                          TickType_t ticks_to_wait) {
   esp_err_t ret = ESP_OK;
@@ -262,6 +284,11 @@ esp_err_t bsp_board_init(uint32_t sample_rate, int channel_format,
   /*!< Initialize I2C bus, used for audio codec*/
   bsp_i2c_init(I2C_NUM, I2C_CLK);
 
+  i2c_device_config_t dev_cfg = {
+      .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+      .device_address = 0x18,
+      .scl_speed_hz = 400000,
+  };  
   if (sample_rate != 16000) {
     ESP_LOGE(TAG, "Unable to configure sample_rate. It's only support 16000.");
     sample_rate = 16000;
@@ -282,27 +309,22 @@ esp_err_t bsp_board_init(uint32_t sample_rate, int channel_format,
 
   vTaskDelay(pdMS_TO_TICKS(1000)); // let ES8311 finish power-up before I2C
 
-  i2c_device_config_t dev_cfg = {
-      .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-      .device_address = 0x18,
-      .scl_speed_hz = 400000,
-  };
   i2c_master_dev_handle_t dev_handle;
   ESP_ERROR_CHECK(
       i2c_master_bus_add_device(i2c_bus_handle, &dev_cfg, &dev_handle));
 
   // 3. Write register address, then read 1 byte back
-  uint8_t reg_addr = 0x0C;
-  uint8_t reg_val = 0;
+  uint8_t reg_addr = 0x0D;
+  uint8_t reg_val = 01;
   esp_err_t ret = i2c_master_transmit_receive(dev_handle, &reg_addr,
                                               1, // write: register address
                                               &reg_val, 1, // read:  1 byte back
                                               pdMS_TO_TICKS(100));
 
   if (ret == ESP_OK) {
-    ESP_LOGI(TAG, "ES8311 reg 0x%02X = 0x%02X", 0x0C, reg_val);
+    ESP_LOGI(TAG, "[DEBUG] ES8311 reg 0x%02X = 0x%02X", 0x0D, reg_val);
   } else {
-    ESP_LOGE(TAG, "Read failed: %s", esp_err_to_name(ret));
+    ESP_LOGE(TAG, "[DEBUG] Read failed: %s", esp_err_to_name(ret));
   }
 
   i2c_master_bus_rm_device(dev_handle);
@@ -312,9 +334,9 @@ esp_err_t bsp_board_init(uint32_t sample_rate, int channel_format,
   // Because record and play use the same i2s.
   ESP_LOGI(TAG, "before codec_init");
   bsp_codec_init(16000, 16000, 2, 16);
-  if (reg_val == 0x20u) {
-    vTaskDelay(pdMS_TO_TICKS(1000)); // let ES8311 finish power-up before I2C
+  if (reg_val != 0x01u) {
     bsp_codec_deinit();
+    vTaskDelay(pdMS_TO_TICKS(1000));
     bsp_codec_init(16000, 16000, 2, 16);
   }
 

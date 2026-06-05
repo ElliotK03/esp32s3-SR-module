@@ -111,4 +111,4 @@ components/hardware_driver/boards/esp32p4-*/
 components/hardware_driver/boards/include/**
 !components/hardware_driver/boards/esp32s3-custom/
 !components/hardware_driver/boards/include/bsp_board.h
-!components/hardware_driver/boards/include/esp32s3_custom_board.h
+!components/hardware_driver/boards/include/esp32s3_custom_board*
