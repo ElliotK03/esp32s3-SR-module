@@ -6,6 +6,11 @@ set(requires
     esp_codec_dev
 )
 
-idf_component_register(SRCS main.c audio-sr.c chime.c speech_commands_action.c
+set(priv_requires
+nvs_flash
+)
+
+idf_component_register(SRCS main.c audio-sr.c chime.c speech_commands_action.c nvs-helper.c
                        REQUIRES ${requires}
+                       PRIV_REQUIRES ${priv_requires}
                        INCLUDE_DIRS "." "include")
