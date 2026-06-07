@@ -1,84 +1,79 @@
 // #include "esp32s3_custom_board.h"
-/* main.c
- *
- * Demo that exercises the NVS helper API:
- *   1. Initialise the NVS flash subsystem.
- *   2. Read the stored user settings (or the defaults if none exist).
- *   3. Print the values to the console.
- *   4. Change a couple of fields, write the new settings back to NVS,
- *      and read them again to verify persistence.
- *
- * Build with the normal ESP‑IDF workflow (idf.py build && idf.py -p <port>
- * flash).
- */
 
+#include "audio-sr.h"
+#include "driver/gpio.h"
 #include "esp_log.h"
-#include "nvs_helper.h"
-#include "user-settings.h"
-#include <inttypes.h>
+#include "hal/gpio_types.h"
 
-static const char *TAG = "demo";
+void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
+  gpio_set_direction(scl, GPIO_MODE_OUTPUT);
+  gpio_set_direction(sda, GPIO_MODE_INPUT);
 
-/* Helper to pretty‑print a settings structure */
-static void print_settings(const user_settings_t *s) {
-  ESP_LOGI(TAG, "Pomodoro settings:");
-  ESP_LOGI(TAG, "  work_duration_s      = %" PRIu32,
-           s->pomodoro.work_duration_s);
-  ESP_LOGI(TAG, "  short_break_s        = %" PRIu32, s->pomodoro.short_break_s);
-  ESP_LOGI(TAG, "  long_break_s         = %" PRIu32, s->pomodoro.long_break_s);
-  ESP_LOGI(TAG, "  sessions_before_long = %u",
-           s->pomodoro.sessions_before_long);
+  for (int i = 0; i < 9; i++) {
+    gpio_set_level(scl, 0);
+    esp_rom_delay_us(5);
+    gpio_set_level(scl, 1);
+    esp_rom_delay_us(5);
+    if (gpio_get_level(sda))
+      break; // SDA released, bus free
+  }
 
-  ESP_LOGI(TAG, "Voice settings:");
-  ESP_LOGI(TAG, "  enabled              = %s",
-           s->voice.enabled ? "true" : "false");
-  ESP_LOGI(TAG, "  wakenet_threshold    = %.2f", s->voice.wakenet_threshold);
-  ESP_LOGI(TAG, "  volume               = %u", s->voice.volume);
+  // Issue STOP condition
+  gpio_set_direction(sda, GPIO_MODE_OUTPUT);
+  gpio_set_level(sda, 0);
+  esp_rom_delay_us(5);
+  gpio_set_level(scl, 1);
+  esp_rom_delay_us(5);
+  gpio_set_level(sda, 1); // STOP: SDA rising while SCL high
 }
 
-/* Entry point for the ESP‑IDF application */
-void app_main(void) {
-  /*  Initialise NVS */
-  ESP_LOGI(TAG, "Initialising NVS helper");
-  nvs_helper_init();
+void app_main() {
 
-  /* Read (or create) the stored settings */
-  user_settings_t settings;
-  esp_err_t err = get_settings_from_nvs(&settings);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to read settings: %s", esp_err_to_name(err));
-    return;
+  // init modules
+  audio_sr_init();
+
+  // ------------------------------------------------------------
+  // Configure GPIO40 as an input with an internal pull‑up resistor.
+  // The board uses GPIO numbers directly, so we use the enum value
+  // GPIO_NUM_40.  The pin is set to INPUT mode, pull‑up enabled and
+  // pull‑down disabled.  No interrupts are required for this simple
+  // poll‑once use‑case.
+  // ------------------------------------------------------------
+  gpio_config_t gpio_cfg = {
+      .pin_bit_mask = (1ULL << GPIO_NUM_40),
+      .mode = GPIO_MODE_INPUT,
+      .pull_up_en = GPIO_PULLUP_ENABLE,
+      .pull_down_en = GPIO_PULLDOWN_DISABLE,
+      .intr_type = GPIO_INTR_DISABLE,
+  };
+  ESP_ERROR_CHECK(gpio_config(&gpio_cfg));
+
+  // ------------------------------------------------------------
+  // Read the current level of GPIO40.  With the internal pull‑up the
+  // line will read high (1) when nothing is driving it low.  Many
+  // boards connect a button that pulls the line to ground when
+  // pressed, so a low level means "button pressed".  We enable the
+  // voice module when the pin is low and disable it when it is high.
+  // Adjust the logic if your hardware uses active‑high signalling.
+  // ------------------------------------------------------------
+  int level = gpio_get_level(GPIO_NUM_40);
+  bool enable_voice = (level == 1);  // active‑low button
+  // voice_module_set_enabled(enable_voice);
+
+  ESP_LOGI("app_main", "GPIO40 level=%d → voice module %s",
+           level, enable_voice ? "ENABLED" : "DISABLED");
+
+  // Forever loop: poll GPIO40 and toggle voice module when state changes
+  bool last_state = enable_voice;
+  while (1) {
+      vTaskDelay(pdMS_TO_TICKS(200)); // 200 ms poll interval
+      int cur_level = gpio_get_level(GPIO_NUM_40);
+      bool cur_enabled = (cur_level == 1);
+      if (cur_enabled != last_state) {
+          voice_module_set_enabled(cur_enabled);
+          ESP_LOGI("app_main", "GPIO40 changed: %d → voice module %s",
+                   cur_level, cur_enabled ? "ENABLED" : "DISABLED");
+          last_state = cur_enabled;
+      }
   }
-
-  ESP_LOGI(TAG, "=== Settings after first read ===");
-  print_settings(&settings);
-
-  /*  Modify a few fields to prove write‑back works */
-  ESP_LOGI(TAG, "Modifying settings for test");
-  settings.pomodoro.work_duration_s = 25 * 60; // 10 min work period
-
-  if (settings.voice.volume > 100) {
-
-    settings.voice.volume = 100;
-  }
-  int diff =
-      (settings.voice.volume >= 0 && settings.voice.volume < 35) ? 1 : -1;
-  settings.voice.volume += diff; // lower volume
-
-  err = write_settings_to_nvs(&settings);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to write settings: %s", esp_err_to_name(err));
-    return;
-  }
-
-  /*  Read back the modified values */
-  user_settings_t verify;
-  err = get_settings_from_nvs(&verify);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to re‑read settings: %s", esp_err_to_name(err));
-    return;
-  }
-
-  ESP_LOGI(TAG, "=== Settings after write‑back ===");
-  print_settings(&verify);
 }
