@@ -30,6 +30,8 @@
 #include "speech_commands_action.h"
 #include <assert.h>
 
+#define LED_ENABLED 0
+
 // Flags for speech_command_actions to read and manipulate LED strip
 led_strip_handle_t strip = NULL;
 int wakeup_flag = 0;
@@ -215,18 +217,18 @@ void audio_sr_init() {
 #endif
 
   task_flag = 1; // for speech detection task toggling
-  // extern led_strip_handle_t strip;
-  strip = configure_led();
   static TaskHandle_t ledTaskHandle = NULL;
   xTaskCreatePinnedToCore(&detect_Task, "detect", 8 * 1024, (void *)afe_data, 5,
                           &detect_task_handle, 1);
   xTaskCreatePinnedToCore(&feed_Task, "feed", 8 * 1024, (void *)afe_data, 5,
                           &feed_task_handle, 0);
-  xTaskCreatePinnedToCore(&led_Task, "led", 1500, NULL, 5, &ledTaskHandle, 1);
-
+  if (LED_ENABLED) { // extern led_strip_handle_t strip;
+    strip = configure_led();
+    xTaskCreatePinnedToCore(&led_Task, "led", 1500, NULL, 5, &ledTaskHandle, 1);
+  }
   int en = 0;
 
-  for (int k=0; k <3; k++) {
+  for (int k = 0; k < 3; k++) {
     vTaskDelay(pdMS_TO_TICKS(8000));
     UBaseType_t highWater = uxTaskGetStackHighWaterMark(ledTaskHandle);
     ESP_LOGI("audio_sr_init()", "led task high‑water: %u bytes left",
