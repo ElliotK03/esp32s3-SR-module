@@ -111,5 +111,5 @@ void led_Task(void *arg) {
 // #endif
 
 void speech_commands_action(int command_id) {
-  execute(command_id);
+  ESP_LOGI("Speech_commands_action", "Recognized command, ID: %d", command_id+1);
 }
