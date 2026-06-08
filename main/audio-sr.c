@@ -160,7 +160,7 @@ void detect_Task(void *arg) {
                 i + 1, mn_result->command_id[i], mn_result->phrase_id[i],
                 mn_result->string, mn_result->prob[i]);
           }
-          xTaskCreate(&chime_ack_task, "chimeAck", 1024, NULL, 3, NULL);
+          xTaskCreate(&chime_ack_task, "chimeAck", 1560, NULL, 3, NULL);
           speech_commands_action(mn_result->command_id[0]);
           detect_flag = 1;
 
@@ -226,10 +226,10 @@ void audio_sr_init() {
 
   int en = 0;
 
-  while (1) {
+  for (int k=0; k <3; k++) {
     vTaskDelay(pdMS_TO_TICKS(8000));
-    UBaseType_t highWater = uxTaskGetStackHighWaterMark(detect_task_handle);
-    ESP_LOGI("audio_sr_init()", "detect task high‑water: %u bytes left",
+    UBaseType_t highWater = uxTaskGetStackHighWaterMark(ledTaskHandle);
+    ESP_LOGI("audio_sr_init()", "led task high‑water: %u bytes left",
              (uint16_t)(highWater * sizeof(StackType_t)));
 
     // en = ((task_flag + 1) % 2);
