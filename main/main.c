@@ -6,6 +6,7 @@
 #include <inttypes.h>
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_heap_caps.h"
@@ -556,14 +557,13 @@ void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
 }
 
 void app_main() {
-
-  // init modules
+  // Initiate hardware
   audio_sr_init();
-
-  xTaskCreate(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
   xTaskCreate(motor_task, "motor_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
+  xTaskCreatePinnedToCore(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL, 1);
   xTaskCreate(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL);
-  xTaskCreate(backlight_task, "backlight_task", 4 * 1024, NULL, 2, NULL);
+  // xTaskCreate(backlight_task, "backlight_task", 4 * 1024, NULL, 2, NULL);
+  
   // ------------------------------------------------------------
   // Configure GPIO40 as an input with an internal pull‑up resistor.
   // The board uses GPIO numbers directly, so we use the enum value

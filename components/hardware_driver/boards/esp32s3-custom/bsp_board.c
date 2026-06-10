@@ -1,31 +1,20 @@
 #include "bsp_board.h"
 #include "esp32s3_custom_board_api.h"
-// #include "esp_codec_dev.h"
 #include "reent.h"
 #include "string.h"
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #include "driver/i2s_std.h"
-// #include "driver/i2s_tdm.h"
+
 #include "soc/soc_caps.h"
 #else
 #include "driver/i2s.h"
 #endif
-// #include "driver/gpio.h"
+
 #include "driver/i2c_master.h"
 #include "esp_codec_dev.h"
 #include "esp_codec_dev_defaults.h"
-// #include "esp_codec_dev_os.h"// #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_log.h"
-// #include "esp_rom_sys.h"
-// #include "esp_vfs_fat.h"
-// #include "sdmmc_cmd.h"
-#if ((SOC_SDMMC_HOST_SUPPORTED) && (FUNC_SDMMC_EN))
-// #include "driver/sdmmc_host.h"
-#endif /* ((SOC_SDMMC_HOST_SUPPORTED) && (FUNC_SDMMC_EN)) */
-// #include "sd_pwr_ctrl_by_on_chip_ldo.h"
-// #include "sd_pwr_ctrl_interface.h"
-// #include "esp_ldo_regulator.h"
 
 #include "i2c_handlers.h"
 
@@ -33,15 +22,11 @@
 #define GPIO_MUTE_LEVEL 1
 #define ACK_CHECK_EN 0x1 /*!< I2C master will check ack from slave*/
 #define ADC_I2S_CHANNEL 2
-// static sdmmc_card_t *card;
+
 static const char *TAG = "board";
 static int s_play_sample_rate = 16000;
 static int s_play_channel_format = 2;
 static int s_bits_per_chan = 16;
-
-// static sd_pwr_ctrl_handle_t pwr_ctrl_handle = NULL;
-// static esp_ldo_channel_handle_t         ldo_audio_board = NULL;
-// static bool esp_ldo_enabled = false;
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0)
 static i2s_chan_handle_t tx_handle = NULL; // I2S tx channel handler
@@ -280,8 +265,6 @@ char *bsp_get_input_format(void) { return "MR"; }
 
 esp_err_t bsp_board_init(uint32_t sample_rate, int channel_format,
                          int bits_per_chan) {
-  // Turn on the power for audio board
-  // bsp_enable_audio_board_power();
 
   /*!< Initialize I2C bus, used for audio codec*/
   bsp_i2c_init(I2C_NUM, I2C_CLK);
@@ -311,11 +294,15 @@ esp_err_t bsp_board_init(uint32_t sample_rate, int channel_format,
 
   vTaskDelay(pdMS_TO_TICKS(1000)); // let ES8311 finish power-up before I2C
 
-  i2c_master_dev_handle_t dev_handle;
+  ESP_LOGI(TAG, "before i2s_init");
+  bsp_i2s_init(I2S_NUM_1, 16000, 2, 16);
+  ESP_LOGI(TAG, "before codec_init");
+  bsp_codec_init(16000, 16000, 2, 16);
+  
+i2c_master_dev_handle_t dev_handle;
   ESP_ERROR_CHECK(
       i2c_master_bus_add_device(i2c_bus_handle, &dev_cfg, &dev_handle));
 
-  // 3. Write register address, then read 1 byte back
   uint8_t reg_addr = 0x0D;
   uint8_t reg_val = 01;
   esp_err_t ret = i2c_master_transmit_receive(dev_handle, &reg_addr,
@@ -331,11 +318,6 @@ esp_err_t bsp_board_init(uint32_t sample_rate, int channel_format,
 
   i2c_master_bus_rm_device(dev_handle);
 
-  ESP_LOGI(TAG, "before i2s_init");
-  bsp_i2s_init(I2S_NUM_1, 16000, 2, 16);
-  // Because record and play use the same i2s.
-  ESP_LOGI(TAG, "before codec_init");
-  bsp_codec_init(16000, 16000, 2, 16);
   if (reg_val != 0x01u) {
     bsp_codec_deinit();
     vTaskDelay(pdMS_TO_TICKS(1000));

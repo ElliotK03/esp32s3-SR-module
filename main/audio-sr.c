@@ -202,6 +202,7 @@ void detect_Task(void *arg) {
 void audio_sr_init() {
   models =
       esp_srmodel_init("model"); // partition label defined in partitions.csv
+
   ESP_ERROR_CHECK(esp_board_init(16000, 2, 16));
   // ESP_ERROR_CHECK(esp_sdcard_init("/sdcard", 10));
 
@@ -228,15 +229,13 @@ void audio_sr_init() {
   }
   int en = 0;
 
-  for (int k = 0; k < 3; k++) {
-    vTaskDelay(pdMS_TO_TICKS(8000));
-    UBaseType_t highWater = uxTaskGetStackHighWaterMark(ledTaskHandle);
-    ESP_LOGI("audio_sr_init()", "led task high‑water: %u bytes left",
-             (uint16_t)(highWater * sizeof(StackType_t)));
+  vTaskDelay(pdMS_TO_TICKS(8000));
+  UBaseType_t highWater = uxTaskGetStackHighWaterMark(ledTaskHandle);
+  ESP_LOGI("audio_sr_init()", "led task high‑water: %u bytes left",
+           (uint16_t)(highWater * sizeof(StackType_t)));
 
-    // en = ((task_flag + 1) % 2);
-    // voice_module_set_enabled(en);
-  }
+  // en = ((task_flag + 1) % 2);
+  // voice_module_set_enabled(en);
 }
 
 // resume or suspend voice module
