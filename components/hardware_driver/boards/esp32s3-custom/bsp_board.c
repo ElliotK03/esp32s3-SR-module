@@ -27,6 +27,8 @@
 // #include "sd_pwr_ctrl_interface.h"
 // #include "esp_ldo_regulator.h"
 
+#include "i2c_handlers.h"
+
 #define GPIO_MUTE_NUM GPIO_NUM_1
 #define GPIO_MUTE_LEVEL 1
 #define ACK_CHECK_EN 0x1 /*!< I2C master will check ack from slave*/
@@ -51,7 +53,7 @@ static audio_codec_ctrl_if_t *codec_ctrl_if = NULL;
 static audio_codec_gpio_if_t *codec_gpio_if = NULL;
 static audio_codec_if_t *codec_if = NULL;
 esp_codec_dev_handle_t codec_dev = NULL;
-static i2c_master_bus_handle_t i2c_bus_handle = NULL;
+// static i2c_master_bus_handle_t i2c_bus_handle = NULL;
 
 static esp_codec_dev_sample_info_t fs = {
       .bits_per_sample = 0u,
