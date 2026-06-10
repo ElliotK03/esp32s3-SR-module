@@ -32,6 +32,13 @@ static void display_task(void *arg);
 static const char *TAG = "ST7789";
 static volatile bool g_gui_ready = false;
 
+#define DISPLAY_TASK_STACK_SIZE  (10 * 1024)
+#define DISPLAY_TASK_PRIORITY    5
+#define MOTOR_TASK_STACK_SIZE  (10 * 1024)
+#define MOTOR_TASK_PRIORITY    2
+#define CONNECTIONS_TASK_STACK_SIZE  (10 * 1024)
+#define CONNECTIONS_TASK_PRIORITY    2
+
 #define CONFIG_WIDTH  240
 #define CONFIG_HEIGHT 320
 #define CONFIG_OFFSETX 0
