@@ -553,6 +553,10 @@ void app_main() {
   // init modules
   audio_sr_init();
 
+  xTaskCreate(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
+  xTaskCreate(motor_task, "motor_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
+  xTaskCreate(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL);
+  xTaskCreate(backlight_task, "backlight_task", 4 * 1024, NULL, 2, NULL);
   // ------------------------------------------------------------
   // Configure GPIO40 as an input with an internal pull‑up resistor.
   // The board uses GPIO numbers directly, so we use the enum value
