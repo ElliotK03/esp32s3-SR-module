@@ -27,6 +27,9 @@
 #include "screen_swipe.h"
 #include "app_logic.h"
 #include "connections.h"
+#include "i2c_handlers.h"
+
+#define ENABLE_AUDIO_SR 1
 
 static void display_task(void *arg);
 
@@ -54,7 +57,7 @@ static volatile bool g_gui_ready = false;
 #define FT6236_ADDR                 0x38            /*!< Slave address of FT6236 */
 
 // I2C Bus 0
-static i2c_master_bus_handle_t i2c_bus_handle;
+i2c_master_bus_handle_t i2c_bus_handle;
 static i2c_master_dev_handle_t ft6236_handle;
 static SemaphoreHandle_t touch_interrupt_sem = NULL;
 static volatile bool touch_data_ready = false;
@@ -63,25 +66,29 @@ static bool g_touch_ready = false;
 // I2C Bus for touch panel, I2C number 0
 static esp_err_t i2c_master_init(void) {
     esp_err_t err; 
+
+#if ENABLE_AUDIO_SR
+#else
     // I2C bus already configured by bsp_board.c
 
-    // if (i2c_bus_handle != NULL && ft6236_handle != NULL) {
-    //     return ESP_OK;
-    // }
+    if (i2c_bus_handle != NULL && ft6236_handle != NULL) {
+        return ESP_OK;
+    }
 
-    // i2c_master_bus_config_t touch_bus_config = {
-    //     .i2c_port = I2C_MASTER_NUM,
-    //     .sda_io_num = TP_SDA,
-    //     .scl_io_num = TP_SCL,
-    //     .clk_source = I2C_CLK_SRC_DEFAULT,
-    //     .glitch_ignore_cnt = 7,
-    //     .flags.enable_internal_pullup = true,
-    // };
+    i2c_master_bus_config_t touch_bus_config = {
+        .i2c_port = I2C_MASTER_NUM,
+        .sda_io_num = TP_SDA,
+        .scl_io_num = TP_SCL,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
 
-    // esp_err_t err = i2c_new_master_bus(&touch_bus_config, &i2c_bus_handle);
-    // if (err != ESP_OK) {
-    //     return err;
-    // }
+    err = i2c_new_master_bus(&touch_bus_config, &i2c_bus_handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+#endif
 
     i2c_device_config_t ft6236_config = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
@@ -148,8 +155,6 @@ static void tp_init(void) {
 
     gpio_install_isr_service(0);
 
-    gpio_reset_pin(TP_SCL);
-    gpio_reset_pin(TP_SDA);
     gpio_reset_pin(TP_INT);
     gpio_reset_pin(TP_RST);
     
@@ -183,7 +188,19 @@ static void tp_init(void) {
     if (i2c_master_init() == ESP_OK) {
         ESP_LOGI(TAG, "I2C Touch Panel Initialized.");
 
-        esp_err_t ret = i2c_master_probe(i2c_bus_handle, FT6236_ADDR, 10);
+        esp_err_t ret = ESP_FAIL;
+        int max_retries = 5;
+        for (int attempt = 1; attempt <= max_retries; attempt++) {
+            ret = i2c_master_probe(i2c_bus_handle, FT6236_ADDR, 100);
+            if (ret == ESP_OK) {
+                break;
+            }
+            if (attempt < max_retries) {
+                ESP_LOGW(TAG, "Touch panel probe attempt %d/%d failed, retrying...", attempt, max_retries);
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+        }
+        
         if (ret == ESP_OK) {
             g_touch_ready = true;
             ESP_LOGI(TAG, "Touch panel detected at address 0x%02x", FT6236_ADDR);
@@ -192,7 +209,7 @@ static void tp_init(void) {
             gpio_intr_enable(TP_INT);
             ESP_LOGI(TAG, "Touch interrupt enabled on GPIO %d", TP_INT);
         } else {
-            ESP_LOGW(TAG, "Touch panel not detected at address 0x%02x (err=%s)", FT6236_ADDR, esp_err_to_name(ret));
+            ESP_LOGW(TAG, "Touch panel not detected at address 0x%02x after %d attempts (err=%s)", FT6236_ADDR, max_retries, esp_err_to_name(ret));
         }
     } else {
         ESP_LOGE(TAG, "I2C Init Failed.");
@@ -262,8 +279,10 @@ static void display_task(void *arg)
     (void)arg;
 
     // Give the serial monitor time to connect over USB before printing important logs
+#if ENABLE_AUDIO_SR
+#else
     vTaskDelay(pdMS_TO_TICKS(3000));
-
+#endif
     printf("Reset reason: %d\n", esp_reset_reason());
 
     // Initialize Touch Controller
@@ -470,7 +489,7 @@ void motor_task(void *arg){
             motor_brake();
             vTaskDelay(pdMS_TO_TICKS(1000));
 
-            ESP_LOGI(TAG, "compare value i = %d", i);
+            // ESP_LOGI(TAG, "compare value i = %d", i);
         }
 
         // vTaskDelay(portMAX_DELAY);
@@ -533,7 +552,6 @@ void backlight_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
-
 void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
   gpio_set_direction(scl, GPIO_MODE_OUTPUT);
   gpio_set_direction(sda, GPIO_MODE_INPUT);
@@ -556,14 +574,55 @@ void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
   gpio_set_level(sda, 1); // STOP: SDA rising while SCL high
 }
 
+// #define CODEC_DEV_ADDR 0x18
+// #define TP_DEV_ADDR 0x38
+
+// static const uint8_t probe_addresses[] = {
+//     CODEC_DEV_ADDR,
+//     TP_DEV_ADDR,
+// };
+
+// static const char *probe_names[] = {
+//     "codec",
+//     "touch panel",
+// };
+
+// // debug task to probe status of devices on I2C bus
+// void i2c_probe_task(void *args){
+
+//     while(1){
+//         vTaskDelay(pdMS_TO_TICKS(1000));
+
+//         const char *TAG = "I2C";
+//         for (size_t i = 0; i < sizeof(probe_addresses) / sizeof(probe_addresses[0]); i++) {
+//             esp_err_t err = i2c_master_probe(i2c_bus_handle, probe_addresses[i], 1000);
+
+//             if (err == ESP_OK) {
+//                 ESP_LOGI(TAG, "%s device 0x%02X detected and responding", probe_names[i], probe_addresses[i]);
+//             } else {
+//                 ESP_LOGE(TAG, "%s device 0x%02X not responding (err=0x%x)", probe_names[i], probe_addresses[i], err);
+//             }
+//         }
+//     }
+
+// }
+
 void app_main() {
+
   // Initiate hardware
+#if ENABLE_AUDIO_SR
   audio_sr_init();
-  xTaskCreate(motor_task, "motor_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
-  xTaskCreatePinnedToCore(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL, 1);
-  xTaskCreate(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL);
-  // xTaskCreate(backlight_task, "backlight_task", 4 * 1024, NULL, 2, NULL);
+#endif
+
+xTaskCreatePinnedToCore(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL, 1);
+xTaskCreate(motor_task, "motor_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
+// xTaskCreate(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL);
+xTaskCreate(backlight_task, "backlight_task", 4 * 1024, NULL, 2, NULL);
+
+// xTaskCreate(i2c_probe_task, "i2c_probe_task", 4 * 1024, NULL, 2, NULL);
   
+#if ENABLE_AUDIO_SR
+
   // ------------------------------------------------------------
   // Configure GPIO40 as an input with an internal pull‑up resistor.
   // The board uses GPIO numbers directly, so we use the enum value
@@ -608,4 +667,5 @@ void app_main() {
           last_state = cur_enabled;
       }
   }
+#endif
 }
