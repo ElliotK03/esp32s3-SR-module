@@ -33,7 +33,12 @@
 
 static void display_task(void *arg);
 
-static const char *TAG = "ST7789";
+static const char *TAG_DISPLAY = "ST7789";
+static const char *TAG_TOUCH = "FT6236";
+static const char *TAG_MOTOR = "motor";
+static const char *TAG_BACKLIGHT = "backlight";
+static const char *TAG_MAIN = "app_main";
+
 static volatile bool g_gui_ready = false;
 
 #define DISPLAY_TASK_STACK_SIZE  (10 * 1024)
@@ -123,7 +128,7 @@ static bool tp_read_point(uint16_t *x, uint16_t *y) {
     // Extract X and Y
     *x = ((data[1] & 0x0F) << 8) | data[2];
     *y = ((data[3] & 0x0F) << 8) | data[4];
-    ESP_LOGI(TAG, "X: %u, Y: %u", *x, *y);
+    ESP_LOGI(TAG_TOUCH, "X: %u, Y: %u", *x, *y);
     touch_data_ready = false;
     
     return true;
@@ -149,7 +154,7 @@ static void tp_init(void) {
     if (touch_interrupt_sem == NULL) {
         touch_interrupt_sem = xSemaphoreCreateBinary();
         if (touch_interrupt_sem == NULL) {
-            ESP_LOGE(TAG, "Failed to create touch interrupt semaphore");
+            ESP_LOGE(TAG_TOUCH, "Failed to create touch interrupt semaphore");
         }
     }
 
@@ -186,7 +191,7 @@ static void tp_init(void) {
 
     // Init I2C bus
     if (i2c_master_init() == ESP_OK) {
-        ESP_LOGI(TAG, "I2C Touch Panel Initialized.");
+        ESP_LOGI(TAG_TOUCH, "I2C Touch Panel Initialized.");
 
         esp_err_t ret = ESP_FAIL;
         int max_retries = 5;
@@ -196,23 +201,23 @@ static void tp_init(void) {
                 break;
             }
             if (attempt < max_retries) {
-                ESP_LOGW(TAG, "Touch panel probe attempt %d/%d failed, retrying...", attempt, max_retries);
+                ESP_LOGW(TAG_TOUCH, "Touch panel probe attempt %d/%d failed, retrying...", attempt, max_retries);
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
         }
         
         if (ret == ESP_OK) {
             g_touch_ready = true;
-            ESP_LOGI(TAG, "Touch panel detected at address 0x%02x", FT6236_ADDR);
+            ESP_LOGI(TAG_TOUCH, "Touch panel detected at address 0x%02x", FT6236_ADDR);
             
             gpio_isr_handler_add(TP_INT, tp_interrupt_handler, NULL);
             gpio_intr_enable(TP_INT);
-            ESP_LOGI(TAG, "Touch interrupt enabled on GPIO %d", TP_INT);
+            ESP_LOGI(TAG_TOUCH, "Touch interrupt enabled on GPIO %d", TP_INT);
         } else {
-            ESP_LOGW(TAG, "Touch panel not detected at address 0x%02x after %d attempts (err=%s)", FT6236_ADDR, max_retries, esp_err_to_name(ret));
+            ESP_LOGW(TAG_TOUCH, "Touch panel not detected at address 0x%02x after %d attempts (err=%s)", FT6236_ADDR, max_retries, esp_err_to_name(ret));
         }
     } else {
-        ESP_LOGE(TAG, "I2C Init Failed.");
+        ESP_LOGE(TAG_TOUCH, "I2C Init Failed.");
     }
 }
 
@@ -489,7 +494,7 @@ void motor_task(void *arg){
             motor_brake();
             vTaskDelay(pdMS_TO_TICKS(1000));
 
-            // ESP_LOGI(TAG, "compare value i = %d", i);
+            // ESP_LOGI(TAG_MOTOR, "compare value i = %d", i);
         }
 
         // vTaskDelay(portMAX_DELAY);
@@ -510,7 +515,7 @@ void set_backlight_brightness(int32_t percent) {
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 
-    ESP_LOGI("BACKLIGHT", "Brightness updated to %d%% (duty: %lu)", (int)percent, (unsigned long)duty);
+    ESP_LOGI(TAG_BACKLIGHT, "Brightness updated to %d%% (duty: %lu)", (int)percent, (unsigned long)duty);
 }
 
 void backlight_task(void *pvParameters) {
@@ -518,7 +523,7 @@ void backlight_task(void *pvParameters) {
     while (!g_gui_ready) {
         vTaskDelay(pdMS_TO_TICKS(50));
     }
-    ESP_LOGI("BACKLIGHT", "GUI is ready! Initializing LEDC Backlight PWM on GPIO %d...", LCD_BL);
+    ESP_LOGI(TAG_BACKLIGHT, "GUI is ready! Initializing LEDC Backlight PWM on GPIO %d...", LCD_BL);
 
     // Configure LEDC Timer
     ledc_timer_config_t ledc_timer = {
@@ -544,7 +549,7 @@ void backlight_task(void *pvParameters) {
     };
     ledc_channel_config(&ledc_channel);
 
-    ESP_LOGI("BACKLIGHT", "Brightness set to initial %d%% (duty: %lu)", (int)initial_brightness, (unsigned long)duty);
+    ESP_LOGI(TAG_BACKLIGHT, "Brightness set to initial %d%% (duty: %lu)", (int)initial_brightness, (unsigned long)duty);
     
     g_backlight_init = true;
 
@@ -651,7 +656,7 @@ xTaskCreate(backlight_task, "backlight_task", 4 * 1024, NULL, 2, NULL);
   bool enable_voice = (level == 1);  // active‑low button
   // voice_module_set_enabled(enable_voice);
 
-  ESP_LOGI("app_main", "GPIO40 level=%d → voice module %s",
+  ESP_LOGI(TAG_MAIN, "GPIO40 level=%d → voice module %s",
            level, enable_voice ? "ENABLED" : "DISABLED");
 
   // Forever loop: poll GPIO40 and toggle voice module when state changes
@@ -662,7 +667,7 @@ xTaskCreate(backlight_task, "backlight_task", 4 * 1024, NULL, 2, NULL);
       bool cur_enabled = (cur_level == 1);
       if (cur_enabled != last_state) {
           voice_module_set_enabled(cur_enabled);
-          ESP_LOGI("app_main", "GPIO40 changed: %d → voice module %s",
+          ESP_LOGI(TAG_MAIN, "GPIO40 changed: %d → voice module %s",
                    cur_level, cur_enabled ? "ENABLED" : "DISABLED");
           last_state = cur_enabled;
       }
