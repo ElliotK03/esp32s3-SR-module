@@ -6,10 +6,12 @@
 #include "freertos/timers.h"
 #include "esp_log.h"
 #include "ui.h"
+#include "settings_manager.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
+void app_logic_set_work_duration(uint32_t secs);
 static const char *TAG = "APP_LOGIC";
 
 // ============= Timer State =============
@@ -307,8 +309,8 @@ const char *get_var_date_str() {
     time_t now;
     struct tm timeinfo;
     time(&now);
-    localtime_r(&now, &timeinfo);
-    
+    localtime_r(&now, &timeinfo); 
+
     // date in dd/mm/yyyy format
     strftime(date_str, sizeof(date_str), "%d/%m/%Y", &timeinfo);
     return date_str;
@@ -389,4 +391,11 @@ void action_button_lock_pressed(lv_event_t * e) {
 void action_button_unlock_pressed(lv_event_t * e) {
     (void)e;
     ESP_LOGI(TAG, "Unlock button pressed");
+}
+
+void app_logic_set_work_duration(uint32_t secs)
+{
+    /* Update the global period used when the user presses “Start”. */
+    pomo_tim_period_sec = secs;
+    update_pomo_period_display();   // refresh the UI text
 }

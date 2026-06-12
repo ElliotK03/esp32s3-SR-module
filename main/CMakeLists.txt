@@ -31,6 +31,7 @@ set(srcs
     st7789.c 
     app_logic.c 
     connections.c
+    settings_manager.c
 )
 
 idf_component_register(SRCS ${srcs}

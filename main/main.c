@@ -19,8 +19,10 @@
 #include "driver/ledc.h"
 #include "hal/gpio_types.h"
 
+#include "nvs_helper.h"
 #include "pinout.h"
 #include "audio-sr.h"
+#include "settings_manager.h"
 #include "st7789.h"
 #include "lvgl.h"
 #include "ui.h"
@@ -613,7 +615,7 @@ void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
 // }
 
 void app_main() {
-
+settings_manager_init();
   // Initiate hardware
 #if ENABLE_AUDIO_SR
   audio_sr_init();

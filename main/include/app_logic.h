@@ -1,13 +1,15 @@
 #ifndef APP_LOGIC_H
 #define APP_LOGIC_H
 
-#include <stdint.h>
+#include "misc/lv_types.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+extern void app_logic_set_work_duration(uint32_t secs);
 // ============= Public API =============
 
 /**
@@ -57,17 +59,17 @@ void toggle_pomo_timer();
 /**
  * Increment pomodoro period by 1 minute
  */
-void action_button_plus_pressed(lv_event_t * e);
+void action_button_plus_pressed(lv_event_t *e);
 
 /**
  * Decrement pomodoro period by 1 minute
  */
-void action_button_minus_pressed(lv_event_t * e);
+void action_button_minus_pressed(lv_event_t *e);
 
 /**
  * Start the pomodoro timer with selected period
  */
-void action_button_start_pomo_pressed(lv_event_t * e);
+void action_button_start_pomo_pressed(lv_event_t *e);
 
 #ifdef __cplusplus
 }

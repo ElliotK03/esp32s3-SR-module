@@ -44,10 +44,5 @@ esp_err_t get_settings_from_nvs(user_settings_t *p_settings) {
 
   esp_err_t ret = nvs_get_blob(my_handle, NVS_KEY_SETTINGS, p_settings, &len);
 
-  if (ret == ESP_ERR_NVS_NOT_FOUND) {
-    ESP_LOGI(TAG, "No settings found, loading defaults");
-    *p_settings = (user_settings_t)USER_SETTINGS_DEFAULT;
-    return write_settings_to_nvs(p_settings); // persist defaults immediately
-  }
   return ret;
 }

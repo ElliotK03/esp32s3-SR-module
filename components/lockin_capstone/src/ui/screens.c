@@ -1,12 +1,14 @@
 #include <string.h>
 
 #include "screens.h"
+#include "esp_log.h"
 #include "images.h"
 #include "fonts.h"
 #include "actions.h"
 #include "vars.h"
 #include "styles.h"
 #include "ui.h"
+#include "settings_manager.h"
 
 #include <string.h>
 
@@ -49,6 +51,28 @@ static void event_handler_cb_settings_volume_slider(lv_event_t *e) {
             set_var_volume(value);
         }
     }
+}
+
+static void volume_slider_continuous_cb(lv_event_t *e)
+{
+    /* Grab the current slider value */
+    int32_t val = (int32_t)lv_slider_get_value(lv_event_get_target(e));
+
+    /* Forward to the existing setter – it clamps, updates the
+       cached settings and calls set_output_vol() (no flash write). */
+    set_var_volume(val);
+}
+
+static void volume_slider_release_cb(lv_event_t *e)
+{
+    int32_t val = (int32_t)lv_slider_get_value(lv_event_get_target(e));
+
+    /* First update the runtime state (same as the continuous callback) */
+    set_var_volume(val);
+
+    /* Then persist the final value to NVS */
+    ESP_LOGI("Screen", "Volume slider released – persisting %d%%", (int)val);
+    settings_manager_set_volume((uint8_t)val);   // writes to NVS
 }
 
 //
@@ -301,7 +325,8 @@ void create_screen_settings() {
             lv_obj_set_pos(obj, 18, 138);
             lv_obj_set_size(obj, 205, 10);
             lv_slider_set_value(obj, get_var_volume(), LV_ANIM_OFF);
-            lv_obj_add_event_cb(obj, event_handler_cb_settings_volume_slider, LV_EVENT_ALL, 0);
+            lv_obj_add_event_cb(obj, volume_slider_continuous_cb, LV_EVENT_VALUE_CHANGED, 0);
+            lv_obj_add_event_cb(obj, volume_slider_release_cb, LV_EVENT_RELEASED, 0);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0x1fea40), LV_PART_INDICATOR | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0x1fea40), LV_PART_KNOB | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);

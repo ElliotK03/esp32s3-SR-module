@@ -27,6 +27,7 @@
 #include "esp_wn_iface.h"
 #include "model_path.h"
 #include "portmacro.h"
+#include "settings_manager.h"
 #include "speech_commands_action.h"
 #include <assert.h>
 
@@ -200,13 +201,14 @@ void detect_Task(void *arg) {
 
 // init speech recognition module
 void audio_sr_init() {
+  const user_settings_t *s = settings_manager_get();
   models =
       esp_srmodel_init("model"); // partition label defined in partitions.csv
 
   ESP_ERROR_CHECK(esp_board_init(16000, 2, 16));
   // ESP_ERROR_CHECK(esp_sdcard_init("/sdcard", 10));
 
-#if CONFIG_IDF_TARGET_ESP32
+  #if CONFIG_IDF_TARGET_ESP32
   printf("This demo only support ESP32S3\n");
   return;
 #else
@@ -233,9 +235,12 @@ void audio_sr_init() {
   UBaseType_t highWater = uxTaskGetStackHighWaterMark(ledTaskHandle);
   ESP_LOGI("audio_sr_init()", "led task high‑water: %u bytes left",
            (uint16_t)(highWater * sizeof(StackType_t)));
-
   // en = ((task_flag + 1) % 2);
   // voice_module_set_enabled(en);
+
+  voice_module_set_enabled(s->voice.enabled);
+  set_output_vol(s->voice.volume);
+  multinet_set_detection_threshold(s->voice.wakenet_threshold);
 }
 
 // resume or suspend voice module
