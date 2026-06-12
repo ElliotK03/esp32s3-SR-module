@@ -34,6 +34,7 @@
 #define ENABLE_AUDIO_SR 1
 
 static void display_task(void *arg);
+void set_backlight_brightness(int32_t percent);
 
 static const char *TAG_DISPLAY = "ST7789";
 static const char *TAG_TOUCH = "FT6236";
@@ -45,7 +46,7 @@ static volatile bool g_gui_ready = false;
 
 #define DISPLAY_TASK_STACK_SIZE  (10 * 1024)
 #define DISPLAY_TASK_PRIORITY    5
-#define MOTOR_TASK_STACK_SIZE  (10 * 1024)
+#define MOTOR_TASK_STACK_SIZE 4096
 #define MOTOR_TASK_PRIORITY    2
 #define CONNECTIONS_TASK_STACK_SIZE  (10 * 1024)
 #define CONNECTIONS_TASK_PRIORITY    2
@@ -321,7 +322,8 @@ static void display_task(void *arg)
     // Allocate and set draw buffers
     static lv_color_t *buf1 = NULL;
     if (!buf1) {
-        buf1 = heap_caps_malloc(240 * 40 * sizeof(lv_color_t), MALLOC_CAP_DMA);
+        buf1 = malloc(240 * 40 * sizeof(lv_color_t));
+        // buf1 = heap_caps_malloc(240 * 40 * sizeof(lv_color_t), MALLOC_CAP_DMA);
         assert(buf1 != NULL);
     }
     lv_display_set_buffers(display, buf1, NULL, 240 * 40 * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
@@ -345,6 +347,8 @@ static void display_task(void *arg)
 
     // Notify that the GUI has finished initialization
     g_gui_ready = true;
+
+    set_backlight_brightness(70);
 
     // Main LVGL loop
     while (1) {
@@ -482,25 +486,27 @@ void motor_task(void *arg){
     mcpwm_timer_enable(timer0);
     mcpwm_timer_start_stop(timer0, MCPWM_TIMER_START_NO_STOP);
 
-    while(1){
-        for(int i = 1000; i <= 8000; i += 1000){
-            motor_turn_ccw(i);
-            vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelete(NULL);
+
+    // while(1){
+    //     for(int i = 1000; i <= 8000; i += 1000){
+    //         motor_turn_ccw(i);
+    //         vTaskDelay(pdMS_TO_TICKS(1000));
             
-            motor_brake();
-            vTaskDelay(pdMS_TO_TICKS(1000));
+    //         motor_brake();
+    //         vTaskDelay(pdMS_TO_TICKS(1000));
 
-            motor_turn_cw(i);
-            vTaskDelay(pdMS_TO_TICKS(1000));
+    //         motor_turn_cw(i);
+    //         vTaskDelay(pdMS_TO_TICKS(1000));
 
-            motor_brake();
-            vTaskDelay(pdMS_TO_TICKS(1000));
+    //         motor_brake();
+    //         vTaskDelay(pdMS_TO_TICKS(1000));
 
-            // ESP_LOGI(TAG_MOTOR, "compare value i = %d", i);
-        }
+    //         // ESP_LOGI(TAG_MOTOR, "compare value i = %d", i);
+    //     }
 
-        // vTaskDelay(portMAX_DELAY);
-    }
+    //     // vTaskDelay(portMAX_DELAY);
+    // }
 }
 
 static volatile bool g_backlight_init = false;
@@ -522,9 +528,9 @@ void set_backlight_brightness(int32_t percent) {
 
 void backlight_task(void *pvParameters) {
     // Wait for display_task to finish initializing GUI
-    while (!g_gui_ready) {
-        vTaskDelay(pdMS_TO_TICKS(50));
-    }
+    // while (!g_gui_ready) {
+    //     vTaskDelay(pdMS_TO_TICKS(50));
+    // }
     ESP_LOGI(TAG_BACKLIGHT, "GUI is ready! Initializing LEDC Backlight PWM on GPIO %d...", LCD_BL);
 
     // Configure LEDC Timer
@@ -553,6 +559,9 @@ void backlight_task(void *pvParameters) {
 
     ESP_LOGI(TAG_BACKLIGHT, "Brightness set to initial %d%% (duty: %lu)", (int)initial_brightness, (unsigned long)duty);
     
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+
     g_backlight_init = true;
 
     // Deleting the task as we no longer need to update the duty cycle
@@ -615,16 +624,20 @@ void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
 // }
 
 void app_main() {
-settings_manager_init();
-  // Initiate hardware
-#if ENABLE_AUDIO_SR
-  audio_sr_init();
-#endif
 
-xTaskCreatePinnedToCore(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL, 1);
-xTaskCreate(motor_task, "motor_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
-// xTaskCreate(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL);
-xTaskCreate(backlight_task, "backlight_task", 4 * 1024, NULL, 2, NULL);
+    // Initialize peripherals
+    xTaskCreate(backlight_task, "backlight_task", 4 * 1024, NULL, 2, NULL);
+    xTaskCreate(motor_task, "motor_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
+    
+    settings_manager_init();
+
+    // Initiate audio pipeline
+    #if ENABLE_AUDIO_SR
+    audio_sr_init();
+    #endif
+
+    xTaskCreatePinnedToCore(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL, 1);
+    xTaskCreate(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL);
 
 // xTaskCreate(i2c_probe_task, "i2c_probe_task", 4 * 1024, NULL, 2, NULL);
   
