@@ -382,15 +382,49 @@ void toggle_pomo_timer() {
     }
 }
 
+static void (*g_persist_volume_cb)(int32_t) = NULL;
+static void (*g_lock_cb)(void) = NULL;
+static void (*g_unlock_cb)(void) = NULL;
+
+void app_logic_register_persist_volume_cb(void (*cb)(int32_t)) {
+    g_persist_volume_cb = cb;
+}
+
+void app_logic_persist_volume(int32_t val) {
+    if (g_persist_volume_cb != NULL) {
+        g_persist_volume_cb(val);
+    } else {
+        ESP_LOGW(TAG, "Persist volume callback not registered!");
+    }
+}
+
+void app_logic_register_lock_cb(void (*cb)(void)) {
+    g_lock_cb = cb;
+}
+
+void app_logic_register_unlock_cb(void (*cb)(void)) {
+    g_unlock_cb = cb;
+}
+
 // ============= Lock/Unlock Button Actions =============
 void action_button_lock_pressed(lv_event_t * e) {
     (void)e;
     ESP_LOGI(TAG, "Lock button pressed");
+    if (g_lock_cb != NULL) {
+        g_lock_cb();
+    } else {
+        ESP_LOGW(TAG, "Lock callback not registered!");
+    }
 }
 
 void action_button_unlock_pressed(lv_event_t * e) {
     (void)e;
     ESP_LOGI(TAG, "Unlock button pressed");
+    if (g_unlock_cb != NULL) {
+        g_unlock_cb();
+    } else {
+        ESP_LOGW(TAG, "Unlock callback not registered!");
+    }
 }
 
 void app_logic_set_work_duration(uint32_t secs)

@@ -55,6 +55,11 @@ void set_var_screen_brightness(int32_t value);
 int32_t get_var_volume();
 void set_var_volume(int32_t value);
 
+void app_logic_register_persist_volume_cb(void (*cb)(int32_t));
+void app_logic_persist_volume(int32_t val);
+void app_logic_register_lock_cb(void (*cb)(void));
+void app_logic_register_unlock_cb(void (*cb)(void));
+
 // Timer functions for external code
 void toggle_pomo_timer();
 

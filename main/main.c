@@ -31,7 +31,7 @@
 #include "connections.h"
 #include "i2c_handlers.h"
 
-#define ENABLE_AUDIO_SR 0
+#define ENABLE_AUDIO_SR 1
 
 static void display_task(void *arg);
 void set_backlight_brightness(int32_t percent);
@@ -511,6 +511,48 @@ void motor_task(void *arg){
     // }
 }
 
+static void persist_volume_wrapper(int32_t val) {
+    settings_manager_set_volume((uint8_t)val);
+}
+
+static TaskHandle_t motor_run_task_handle = NULL;
+
+static void motor_run_timer_task(void *pvParameters) {
+    int dir = (int)pvParameters; // 1 = CW (lock), 2 = CCW (unlock)
+    if (dir == 1) {
+        ESP_LOGI(TAG_MOTOR, "Turning motor CW (Lock) for 3 seconds...");
+        motor_turn_cw(COUNTER_PERIOD);
+    } else {
+        ESP_LOGI(TAG_MOTOR, "Turning motor CCW (Unlock) for 3 seconds...");
+        motor_turn_ccw(COUNTER_PERIOD);
+    }
+    
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    
+    ESP_LOGI(TAG_MOTOR, "Braking motor...");
+    motor_brake();
+    
+    motor_run_task_handle = NULL;
+    vTaskDelete(NULL);
+}
+
+static void trigger_motor_run(int dir) {
+    if (motor_run_task_handle != NULL) {
+        vTaskDelete(motor_run_task_handle);
+        motor_brake();
+        motor_run_task_handle = NULL;
+    }
+    xTaskCreate(motor_run_timer_task, "motor_run_timer_task", 2048, (void *)dir, 2, &motor_run_task_handle);
+}
+
+static void motor_lock_cb(void) {
+    trigger_motor_run(1);
+}
+
+static void motor_unlock_cb(void) {
+    trigger_motor_run(2);
+}
+
 static volatile bool g_backlight_init = false;
 
 void set_backlight_brightness(int32_t percent) {
@@ -638,7 +680,7 @@ void debug_mem_task(void *args){
 }
 
 void app_main() {
-    xTaskCreate(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL);
+    // xTaskCreate(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL);
 
     // Initialize peripherals
     motor_task(NULL);
@@ -646,6 +688,11 @@ void app_main() {
     // xTaskCreate(backlight_task, "backlight_task", 2048, NULL, 2, NULL);
     // xTaskCreate(motor_task, "motor_task", 2048, NULL, 2, NULL);
     xTaskCreate(debug_mem_task, "debug_mem_task", 4096, NULL, 4, NULL);
+
+    // Register UI logic callbacks
+    app_logic_register_persist_volume_cb(persist_volume_wrapper);
+    app_logic_register_lock_cb(motor_lock_cb);
+    app_logic_register_unlock_cb(motor_unlock_cb);
     
     settings_manager_init();
 
@@ -653,8 +700,8 @@ void app_main() {
     #if ENABLE_AUDIO_SR
     audio_sr_init();
     #endif
-
-    xTaskCreate(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
+    
+    xTaskCreatePinnedToCore(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL, 1);
 
 #if ENABLE_AUDIO_SR
 

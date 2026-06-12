@@ -8,7 +8,7 @@
 #include "vars.h"
 #include "styles.h"
 #include "ui.h"
-#include "settings_manager.h"
+#include "app_logic.h"
 
 #include <string.h>
 
@@ -72,7 +72,7 @@ static void volume_slider_release_cb(lv_event_t *e)
 
     /* Then persist the final value to NVS */
     ESP_LOGI("Screen", "Volume slider released – persisting %d%%", (int)val);
-    settings_manager_set_volume((uint8_t)val);   // writes to NVS
+    app_logic_persist_volume(val);
 }
 
 //

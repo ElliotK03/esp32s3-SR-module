@@ -224,7 +224,7 @@ void audio_sr_init() {
   xTaskCreatePinnedToCore(&detect_Task, "detect", 8 * 1024, (void *)afe_data, 5,
                           &detect_task_handle, 1);
   xTaskCreatePinnedToCore(&feed_Task, "feed", 8 * 1024, (void *)afe_data, 5,
-                          &feed_task_handle, 0);
+                          &feed_task_handle, 1);
   if (LED_ENABLED) { // extern led_strip_handle_t strip;
     strip = configure_led();
     xTaskCreatePinnedToCore(&led_Task, "led", 1500, NULL, 5, &ledTaskHandle, 1);
