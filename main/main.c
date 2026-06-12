@@ -569,7 +569,7 @@ void backlight_task(void *pvParameters) {
 }
 
 void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
-  zgpio_set_direction(scl, GPIO_MODE_OUTPUT);
+  gpio_set_direction(scl, GPIO_MODE_OUTPUT);
   gpio_set_direction(sda, GPIO_MODE_INPUT);
 
   for (int i = 0; i < 9; i++) {
