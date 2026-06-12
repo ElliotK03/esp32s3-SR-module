@@ -37,6 +37,7 @@ sdkconfig.defaults.esp32h2
 *.pyc
 __pycache__/
 managed_components/
+!managed_components/espressif__esp-sr
 *.d
 *.o
 *.obj
