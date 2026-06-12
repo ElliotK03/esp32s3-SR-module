@@ -32,6 +32,7 @@
 #include "i2c_handlers.h"
 
 #define ENABLE_AUDIO_SR 1
+#define SUSPEND_AUDIO_GPIO 0
 
 static void display_task(void *arg);
 void set_backlight_brightness(int32_t percent);
@@ -285,14 +286,13 @@ static TFT_t s_dev;
 static void display_task(void *arg)
 {
     (void)arg;
-
+    
+    ESP_LOGI(TAG_DISPLAY, "Entered Display Task");
     // Give the serial monitor time to connect over USB before printing important logs
 #if ENABLE_AUDIO_SR
 #else
     vTaskDelay(pdMS_TO_TICKS(3000));
 #endif
-    printf("Reset reason: %d\n", esp_reset_reason());
-
     // Initialize Touch Controller
     tp_init();
 
@@ -680,14 +680,14 @@ void debug_mem_task(void *args){
 }
 
 void app_main() {
-    // xTaskCreate(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL);
+    ESP_LOGI(TAG_MAIN, "Reset reason: %d\n", esp_reset_reason());
+    
+    xTaskCreatePinnedToCore(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL, 0);
 
     // Initialize peripherals
     motor_task(NULL);
     backlight_task(NULL);
-    // xTaskCreate(backlight_task, "backlight_task", 2048, NULL, 2, NULL);
-    // xTaskCreate(motor_task, "motor_task", 2048, NULL, 2, NULL);
-    xTaskCreate(debug_mem_task, "debug_mem_task", 4096, NULL, 4, NULL);
+    // xTaskCreate(debug_mem_task, "debug_mem_task", 4096, NULL, 4, NULL);
 
     // Register UI logic callbacks
     app_logic_register_persist_volume_cb(persist_volume_wrapper);
@@ -697,14 +697,26 @@ void app_main() {
     settings_manager_init();
 
     // Initiate audio pipeline
-    #if ENABLE_AUDIO_SR
+#if ENABLE_AUDIO_SR
     audio_sr_init();
-    #endif
-    
-    xTaskCreatePinnedToCore(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL, 1);
+#endif
+
+    // Allocate display task into PSRAM
+    xTaskCreatePinnedToCoreWithCaps(
+        display_task,
+        "display_task",
+        DISPLAY_TASK_STACK_SIZE,
+        NULL,
+        DISPLAY_TASK_PRIORITY,
+        NULL,
+        1,
+        MALLOC_CAP_SPIRAM
+    );
+
+    // xTaskCreate(display_task, "display_task", DISPLAY_TASK_STACK_SIZE, NULL, DISPLAY_TASK_PRIORITY, NULL);
 
 #if ENABLE_AUDIO_SR
-
+#if SUSPEND_AUDIO_GPIO
     // ------------------------------------------------------------
     // Configure GPIO40 as an input with an internal pull‑up resistor.
     // The board uses GPIO numbers directly, so we use the enum value
@@ -752,4 +764,7 @@ void app_main() {
         }
     }
 #endif
+#endif
+    vTaskDelete(NULL);
+
 }

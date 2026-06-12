@@ -132,7 +132,7 @@ void detect_Task(void *arg) {
       if (res->wakeup_state == WAKENET_DETECTED) {
         ESP_LOGI("detect_Task", "WAKEWORD DETECTED");
         multinet->clean(model_data);
-        xTaskCreate(chime_wake_task, "chimeWake", 4096, NULL, 3, NULL);
+        xTaskCreatePinnedToCore(chime_wake_task, "chimeWake", 4096, NULL, 10, NULL, 1);
       }
 
       if (res->raw_data_channels == 1 &&
@@ -163,7 +163,7 @@ void detect_Task(void *arg) {
                 i + 1, mn_result->command_id[i], mn_result->phrase_id[i],
                 mn_result->string, mn_result->prob[i]);
           }
-          xTaskCreate(&chime_ack_task, "chimeAck", 1560, NULL, 3, NULL);
+          xTaskCreatePinnedToCore(&chime_ack_task, "chimeAck", 1560, NULL, 10, NULL, 1);
           speech_commands_action(mn_result->command_id[0]);
           detect_flag = 1;
 
@@ -221,9 +221,9 @@ void audio_sr_init() {
 
   task_flag = 1; // for speech detection task toggling
   static TaskHandle_t ledTaskHandle = NULL;
-  xTaskCreatePinnedToCore(&detect_Task, "detect", 8 * 1024, (void *)afe_data, 5,
-                          &detect_task_handle, 1);
-  xTaskCreatePinnedToCore(&feed_Task, "feed", 8 * 1024, (void *)afe_data, 5,
+  xTaskCreatePinnedToCore(&detect_Task, "detect", 6 * 1024, (void *)afe_data, 5,
+                          &detect_task_handle, 0);
+  xTaskCreatePinnedToCore(&feed_Task, "feed", 6 * 1024, (void *)afe_data, 5,
                           &feed_task_handle, 1);
   if (LED_ENABLED) { // extern led_strip_handle_t strip;
     strip = configure_led();
@@ -231,10 +231,10 @@ void audio_sr_init() {
   }
   int en = 0;
 
-  vTaskDelay(pdMS_TO_TICKS(8000));
-  UBaseType_t highWater = uxTaskGetStackHighWaterMark(ledTaskHandle);
-  ESP_LOGI("audio_sr_init()", "led task high‑water: %u bytes left",
-           (uint16_t)(highWater * sizeof(StackType_t)));
+  // vTaskDelay(pdMS_TO_TICKS(8000));
+  // UBaseType_t highWater = uxTaskGetStackHighWaterMark(ledTaskHandle);
+  // ESP_LOGI("audio_sr_init()", "led task high-water: %u bytes left",
+  //          (uint16_t)(highWater * sizeof(StackType_t)));
   // en = ((task_flag + 1) % 2);
   // voice_module_set_enabled(en);
 
