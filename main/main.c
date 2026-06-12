@@ -42,6 +42,7 @@ static const char *TAG_TOUCH = "FT6236";
 static const char *TAG_MOTOR = "motor";
 static const char *TAG_BACKLIGHT = "backlight";
 static const char *TAG_MAIN = "app_main";
+static const char *TAG_MEM = "memory";
 
 static volatile bool g_gui_ready = false;
 
@@ -669,12 +670,35 @@ void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
 
 void debug_mem_task(void *args){
     while (1){
-        ESP_LOGI(TAG_DISPLAY,
-                 "Internal=%u DMA=%u PSRAM=%u LargestDMA=%u",
-                 heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                 heap_caps_get_free_size(MALLOC_CAP_DMA),
-                 heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-                 heap_caps_get_largest_free_block(MALLOC_CAP_DMA));
+        size_t internal_free =
+            heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+
+        size_t internal_largest =
+            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+
+        size_t psram_free =
+            heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+
+        size_t psram_largest =
+            heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+
+        size_t dma_free =
+            heap_caps_get_free_size(MALLOC_CAP_DMA);
+
+        size_t total_free =
+            esp_get_free_heap_size();
+
+        ESP_LOGI(TAG_MEM,
+                 "INT: free=%u largest=%u | "
+                 "PSRAM: free=%u largest=%u | "
+                 "DMA=%u | TOTAL=%u",
+                 (unsigned)internal_free,
+                 (unsigned)internal_largest,
+                 (unsigned)psram_free,
+                 (unsigned)psram_largest,
+                 (unsigned)dma_free,
+                 (unsigned)total_free);
+
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -687,7 +711,7 @@ void app_main() {
     // Initialize peripherals
     motor_task(NULL);
     backlight_task(NULL);
-    // xTaskCreate(debug_mem_task, "debug_mem_task", 4096, NULL, 4, NULL);
+    xTaskCreate(debug_mem_task, "debug_mem_task", 4096, NULL, 4, NULL);
 
     // Register UI logic callbacks
     app_logic_register_persist_volume_cb(persist_volume_wrapper);
