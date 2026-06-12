@@ -36,8 +36,6 @@ sdkconfig.defaults.esp32h2
 *.log
 *.pyc
 __pycache__/
-managed_components/
-!managed_components/espressif__esp-sr
 *.d
 *.o
 *.obj
@@ -113,3 +111,7 @@ components/hardware_driver/boards/include/**
 !components/hardware_driver/boards/esp32s3-custom/
 !components/hardware_driver/boards/include/bsp_board.h
 !components/hardware_driver/boards/include/esp32s3_custom_board*
+
+managed_components/*
+!managed_components/espressif__esp-sr/
+!managed_components/espressif__esp-sr/**
