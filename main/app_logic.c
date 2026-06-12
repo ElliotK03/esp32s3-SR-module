@@ -399,3 +399,8 @@ void app_logic_set_work_duration(uint32_t secs)
     pomo_tim_period_sec = secs;
     update_pomo_period_display();   // refresh the UI text
 }
+
+uint32_t get_pomo_period()
+{
+    return pomo_tim_period_sec;
+}

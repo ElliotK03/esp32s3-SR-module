@@ -14,6 +14,7 @@
 
 #include "esp_board_init.h"
 #include "speech_commands_action.h"
+#include "app_logic.h"
 // #include "led_strip_types.h"
 
 #include "reent.h"
@@ -112,4 +113,15 @@ void led_Task(void *arg) {
 
 void speech_commands_action(int command_id) {
   ESP_LOGI("Speech_commands_action", "Recognized command, ID: %d", command_id+1);
+  
+  // Tie voice commands to the GUI Pomodoro timer:
+  // ID 14: "TURN ON THE LIGHT" -> START
+  // ID 15: "TURN OFF THE LIGHT" / "TURN OF THE LIGHT" -> STOP
+  if (command_id + 1 == 14) {
+      ESP_LOGI("Speech_commands_action", "Voice command: START TIMER");
+      start_timer(get_pomo_period());
+  } else if (command_id + 1 == 15) {
+      ESP_LOGI("Speech_commands_action", "Voice command: STOP TIMER");
+      stop_timer();
+  }
 }

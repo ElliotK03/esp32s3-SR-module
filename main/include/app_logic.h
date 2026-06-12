@@ -23,6 +23,11 @@ void start_timer(uint32_t duration_seconds);
 void stop_timer();
 
 /**
+ * Get the current pomodoro period duration in seconds
+ */
+uint32_t get_pomo_period();
+
+/**
  * Check if timer is currently running
  */
 bool is_timer_running();
