@@ -221,9 +221,9 @@ void audio_sr_init() {
 
   task_flag = 1; // for speech detection task toggling
   static TaskHandle_t ledTaskHandle = NULL;
-  xTaskCreatePinnedToCore(&detect_Task, "detect", 6 * 1024, (void *)afe_data, 5,
+  xTaskCreatePinnedToCore(&detect_Task, "detect", 3 * 1024, (void *)afe_data, 5,
                           &detect_task_handle, 0);
-  xTaskCreatePinnedToCore(&feed_Task, "feed", 6 * 1024, (void *)afe_data, 5,
+  xTaskCreatePinnedToCore(&feed_Task, "feed", 2 * 1024, (void *)afe_data, 5,
                           &feed_task_handle, 1);
   if (LED_ENABLED) { // extern led_strip_handle_t strip;
     strip = configure_led();

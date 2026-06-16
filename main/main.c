@@ -733,7 +733,7 @@ void app_main() {
         NULL,
         DISPLAY_TASK_PRIORITY,
         NULL,
-        1,
+        0,
         MALLOC_CAP_SPIRAM
     );
 
