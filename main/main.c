@@ -33,6 +33,7 @@
 
 #define ENABLE_AUDIO_SR 1
 #define SUSPEND_AUDIO_GPIO 0
+#define ENABLE_DEBUG_MEM 0
 
 static void display_task(void *arg);
 void set_backlight_brightness(int32_t percent);
@@ -667,6 +668,7 @@ void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
 //     }
 
 // }
+#if ENABLE_DEBUG_MEM
 
 void debug_mem_task(void *args){
     while (1){
@@ -702,6 +704,7 @@ void debug_mem_task(void *args){
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
+#endif
 
 void app_main() {
     ESP_LOGI(TAG_MAIN, "Reset reason: %d\n", esp_reset_reason());
@@ -711,7 +714,10 @@ void app_main() {
     // Initialize peripherals
     motor_task(NULL);
     backlight_task(NULL);
+
+#if ENABLE_DEBUG_MEM
     xTaskCreate(debug_mem_task, "debug_mem_task", 4096, NULL, 4, NULL);
+#endif
 
     // Register UI logic callbacks
     app_logic_register_persist_volume_cb(persist_volume_wrapper);
