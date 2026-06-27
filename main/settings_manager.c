@@ -36,6 +36,10 @@ void settings_manager_init(void) {
   ESP_LOGI(TAG, "Settings loaded – applying");
   apply_voice_settings(&cached_settings.voice);
   apply_pomodoro_settings(&cached_settings.pomodoro);
+
+  // Experimental, updating the values displayed by LVGL so value is correct on startup
+  set_var_volume(cached_settings.voice.volume);
+  set_var_screen_brightness_val(cached_settings.brightness);
 }
 
 /* ------------------------------------------------------------------ */
@@ -89,6 +93,14 @@ esp_err_t settings_manager_set_wakenet_threshold(float th) {
   }
   user_settings_t upd = cached_settings;
   upd.voice.wakenet_threshold = th;
+  return settings_manager_set(&upd);
+}
+
+esp_err_t settings_manager_set_brightness(int32_t brightness) {
+  if (brightness > 100)
+    brightness = 100;
+  user_settings_t upd = cached_settings;
+  upd.brightness = brightness;
   return settings_manager_set(&upd);
 }
 

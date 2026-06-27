@@ -13,6 +13,8 @@ extern void action_button_start_pomo_pressed(lv_event_t * e);
 extern void action_button_lock_pressed(lv_event_t * e);
 extern void action_button_unlock_pressed(lv_event_t * e);
 extern void action_button_reset_device_pressed(lv_event_t * e);
+extern void action_slider_volume_released(lv_event_t * e);
+extern void action_slider_brightness_released(lv_event_t * e);
 
 #ifdef __cplusplus
 }

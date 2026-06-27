@@ -281,6 +281,7 @@ void create_screen_settings() {
             objects.screen_brightness_slider = obj;
             lv_obj_set_pos(obj, 36, 68);
             lv_obj_set_size(obj, 187, 10);
+            lv_obj_add_event_cb(obj, action_slider_brightness_released, LV_EVENT_RELEASED, (void *)0);
             lv_obj_add_event_cb(obj, event_handler_cb_settings_screen_brightness_slider, LV_EVENT_ALL, 0);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
         }
@@ -297,6 +298,7 @@ void create_screen_settings() {
             objects.volume_slider = obj;
             lv_obj_set_pos(obj, 36, 114);
             lv_obj_set_size(obj, 187, 10);
+            lv_obj_add_event_cb(obj, action_slider_volume_released, LV_EVENT_RELEASED, (void *)0);
             lv_obj_add_event_cb(obj, event_handler_cb_settings_volume_slider, LV_EVENT_ALL, 0);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0x2196f3), LV_PART_INDICATOR | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);

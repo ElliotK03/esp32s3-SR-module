@@ -180,6 +180,14 @@
         "defaultValue": "0",
         "persistent": false,
         "native": false
+      },
+      {
+        "objID": "b6a2c7d7-afff-4b04-8a0f-3c144541acf0",
+        "name": "volume",
+        "type": "integer",
+        "defaultValue": "0",
+        "persistent": false,
+        "native": false
       }
     ],
     "structures": [],
@@ -239,6 +247,24 @@
       "componentGroups": [],
       "userProperties": [],
       "name": "button_reset_device_pressed"
+    },
+    {
+      "objID": "0ce70b6e-dd5f-4b3a-f467-e231347d90e4",
+      "components": [],
+      "connectionLines": [],
+      "localVariables": [],
+      "componentGroups": [],
+      "userProperties": [],
+      "name": "slider_volume_released"
+    },
+    {
+      "objID": "f9f8dcaa-1217-4ee7-ed23-4399d004d799",
+      "components": [],
+      "connectionLines": [],
+      "localVariables": [],
+      "componentGroups": [],
+      "userProperties": [],
+      "name": "slider_brightness_released"
     }
   ],
   "userPages": [
@@ -1158,7 +1184,15 @@
                 "childStyles": []
               },
               "timeline": [],
-              "eventHandlers": [],
+              "eventHandlers": [
+                {
+                  "objID": "e63c2868-3f99-464c-dd5e-8b2debde39b7",
+                  "eventName": "RELEASED",
+                  "handlerType": "action",
+                  "action": "slider_brightness_released",
+                  "userData": 0
+                }
+              ],
               "identifier": "screen_brightness_slider",
               "leftUnit": "px",
               "topUnit": "px",
@@ -1266,7 +1300,15 @@
                 "childStyles": []
               },
               "timeline": [],
-              "eventHandlers": [],
+              "eventHandlers": [
+                {
+                  "objID": "98b09f24-4db5-40ec-aab5-43671048b1af",
+                  "eventName": "RELEASED",
+                  "handlerType": "action",
+                  "action": "slider_volume_released",
+                  "userData": 0
+                }
+              ],
               "identifier": "volume_slider",
               "leftUnit": "px",
               "topUnit": "px",
@@ -1306,8 +1348,8 @@
               "max": 100,
               "maxType": "literal",
               "mode": "NORMAL",
-              "value": 25,
-              "valueType": "literal",
+              "value": "volume",
+              "valueType": "expression",
               "previewValue": 25,
               "valueLeft": 0,
               "valueLeftType": "literal",

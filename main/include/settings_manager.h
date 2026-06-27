@@ -29,3 +29,4 @@ esp_err_t settings_manager_set_voice_enabled(bool en);
 esp_err_t settings_manager_set_wakenet_threshold(float th);
 esp_err_t settings_manager_set_volume(uint8_t vol);
 esp_err_t settings_manager_set_pomodoro_work(uint32_t secs);
+esp_err_t settings_manager_set_brightness(int32_t brightness);

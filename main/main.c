@@ -352,7 +352,7 @@ static void display_task(void *arg)
     // Notify that the GUI has finished initialization
     g_gui_ready = true;
 
-    set_backlight_brightness(70);
+    set_backlight_brightness(get_var_screen_brightness_val());
 
     // Main LVGL loop
     while (1) {
@@ -513,9 +513,44 @@ void motor_task(void *arg){
     // }
 }
 
-static void persist_volume_wrapper(int32_t val) {
-    // settings_manager_set_volume((uint8_t)val);
+
+/* NVS Writing Callbacks START */
+
+// This variable has to be placed in DRAM
+DRAM_ATTR static uint8_t temp_vol;
+// This task has to be created as main display code is executing in PSRAM
+// SPI cache will be disabled while NVS transaction is occuring
+void write_nvs_volume_task(void * args){
+    // Write to NVS flash
+    settings_manager_set_volume(temp_vol);
+    vTaskDelete(NULL);
 }
+
+// Write volume setting to NVS
+static void set_volume_nvs_callback(int32_t volume_value){
+    temp_vol = volume_value;
+
+    // Set the current volume
+    set_output_vol(temp_vol);
+    xTaskCreate(write_nvs_volume_task, "Write volume NVS task", 2048, NULL, 5, NULL);
+}
+
+// This variable has to be placed in DRAM
+DRAM_ATTR static int32_t temp_bri;
+void write_nvs_brightness_task(void * args){
+    
+    // Write to NVS flash
+    settings_manager_set_brightness(temp_bri);
+    vTaskDelete(NULL);
+}
+
+// Write volume setting to NVS
+static void set_brightness_nvs_callback(int32_t brightness){
+    temp_bri = brightness;
+    xTaskCreate(write_nvs_volume_task, "Write brightness NVS task", 2048, NULL, 5, NULL);
+}
+
+/* NVS Writing Callbacks END*/
 
 static TaskHandle_t motor_run_task_handle = NULL;
 
@@ -724,11 +759,15 @@ void app_main() {
 #endif
 
     // Register UI logic callbacks
-    app_logic_register_persist_volume_cb(persist_volume_wrapper);
     app_logic_register_lock_cb(motor_lock_cb);
     app_logic_register_unlock_cb(motor_unlock_cb);
     app_logic_register_reset_cb(reset_device_callback);
     app_logic_register_persist_brightness_cb(set_backlight_brightness);
+
+    // NVS writing callbacks
+    app_logic_register_volume_released_cb(set_volume_nvs_callback);
+    app_logic_register_brightness_released_cb(set_brightness_nvs_callback);
+
     settings_manager_init();
 
     // Initiate audio pipeline

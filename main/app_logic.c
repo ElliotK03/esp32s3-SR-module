@@ -11,11 +11,12 @@
 #include <string.h>
 #include <time.h>
 
-static void (*g_persist_volume_cb)(int32_t) = NULL;
 static void (*g_persist_brightness_cb)(int32_t) = NULL;
 static void (*g_lock_cb)(void) = NULL;
 static void (*g_unlock_cb)(void) = NULL;
 static void (*g_reset_cb)(void) = NULL;
+static void (*g_volume_release)(int32_t) = NULL;
+static void (*g_brightness_release)(int32_t) = NULL;
 
 void app_logic_set_work_duration(uint32_t secs);
 static const char *TAG = "APP_LOGIC";
@@ -391,9 +392,6 @@ void set_var_volume(int32_t value) {
     if (value > 100) value = 100;
     volume_value = value;
 
-    // Call the callback registered in main.c
-    g_persist_volume_cb(volume_value);
-
     ESP_LOGI(TAG, "Volume updated to %d%%", (int)volume_value);
 }
 
@@ -406,10 +404,6 @@ void toggle_pomo_timer() {
         ESP_LOGI(TAG, "Toggling timer: starting timer with duration %u seconds", (unsigned int)pomo_tim_period_sec);
         start_timer(pomo_tim_period_sec);
     }
-}
-
-void app_logic_register_persist_volume_cb(void (*cb)(int32_t)) {
-    g_persist_volume_cb = cb;
 }
 
 void app_logic_register_persist_brightness_cb(void (*cb)(int32_t)) {
@@ -426,6 +420,14 @@ void app_logic_register_unlock_cb(void (*cb)(void)) {
 
 void app_logic_register_reset_cb(void (*cb)(void)) {
     g_unlock_cb = cb;
+}
+
+void app_logic_register_volume_released_cb(void (*cb)(int32_t)) {
+    g_volume_release = cb;
+}
+
+void app_logic_register_brightness_released_cb(void (*cb)(int32_t)) {
+    g_brightness_release = cb;
 }
 
 // ============= Lock/Unlock Button Actions =============
@@ -470,4 +472,13 @@ void action_button_reset_device_pressed(lv_event_t * e){
         ESP_LOGW(TAG, "Reset callback not registered!");
     }
 };
+
+void action_slider_volume_released(lv_event_t * e){
+    ESP_LOGI(TAG, "Volume slider released, writing to NVS flash");
+    g_volume_release(volume_value);
+}
+
+void action_slider_brightness_released(lv_event_t * e){
+    g_brightness_release(screen_brightness);
+}
 

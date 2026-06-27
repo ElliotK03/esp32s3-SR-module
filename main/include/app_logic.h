@@ -58,8 +58,9 @@ void set_var_volume(int32_t value);
 const char *get_var_wifi_status_str();
 void set_var_wifi_status_str(const char *value);
 
-void app_logic_register_persist_volume_cb(void (*cb)(int32_t));
 void app_logic_register_persist_brightness_cb(void (*cb)(int32_t));
+void app_logic_register_volume_released_cb(void (*cb)(int32_t));
+void app_logic_register_brightness_released_cb(void (*cb)(int32_t));
 
 void app_logic_register_lock_cb(void (*cb)(void));
 void app_logic_register_unlock_cb(void (*cb)(void));
@@ -85,6 +86,18 @@ void action_button_minus_pressed(lv_event_t *e);
  * Start the pomodoro timer with selected period
  */
 void action_button_start_pomo_pressed(lv_event_t *e);
+
+
+/**
+ * Write to NVS flash when volume slider released
+ */
+void action_slider_volume_released(lv_event_t * e);
+
+/**
+ * Write to NVS flash when brightness slider released
+ */
+void action_slider_brightness_released(lv_event_t * e);
+
 
 #ifdef __cplusplus
 }
