@@ -555,6 +555,10 @@ static void motor_unlock_cb(void) {
     trigger_motor_run(2);
 }
 
+static void reset_device_callback(void){
+    // TODO: Implement device wifi reset code
+}
+
 static volatile bool g_backlight_init = false;
 
 void set_backlight_brightness(int32_t percent) {
@@ -723,6 +727,7 @@ void app_main() {
     app_logic_register_persist_volume_cb(persist_volume_wrapper);
     app_logic_register_lock_cb(motor_lock_cb);
     app_logic_register_unlock_cb(motor_unlock_cb);
+    app_logic_register_reset_cb(reset_device_callback);
     
     settings_manager_init();
 

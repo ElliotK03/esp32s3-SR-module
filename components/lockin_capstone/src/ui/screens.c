@@ -1,14 +1,12 @@
 #include <string.h>
 
 #include "screens.h"
-#include "esp_log.h"
 #include "images.h"
 #include "fonts.h"
 #include "actions.h"
 #include "vars.h"
 #include "styles.h"
 #include "ui.h"
-#include "app_logic.h"
 
 #include <string.h>
 
@@ -29,50 +27,6 @@ static void event_handler_cb_main_obj0(lv_event_t *e) {
             set_var_timer_arc_value(value);
         }
     }
-}
-
-static void event_handler_cb_settings_screen_brightness_slider(lv_event_t *e) {
-    lv_event_code_t event = lv_event_get_code(e);
-    if (event == LV_EVENT_VALUE_CHANGED) {
-        lv_obj_t *ta = lv_event_get_target_obj(e);
-        if (tick_value_change_obj != ta) {
-            int32_t value = lv_slider_get_value(ta);
-            set_var_screen_brightness(value);
-        }
-    }
-}
-
-static void event_handler_cb_settings_volume_slider(lv_event_t *e) {
-    lv_event_code_t event = lv_event_get_code(e);
-    if (event == LV_EVENT_VALUE_CHANGED) {
-        lv_obj_t *ta = lv_event_get_target_obj(e);
-        if (tick_value_change_obj != ta) {
-            int32_t value = lv_slider_get_value(ta);
-            set_var_volume(value);
-        }
-    }
-}
-
-static void volume_slider_continuous_cb(lv_event_t *e)
-{
-    /* Grab the current slider value */
-    int32_t val = (int32_t)lv_slider_get_value(lv_event_get_target(e));
-
-    /* Forward to the existing setter – it clamps, updates the
-       cached settings and calls set_output_vol() (no flash write). */
-    set_var_volume(val);
-}
-
-static void volume_slider_release_cb(lv_event_t *e)
-{
-    int32_t val = (int32_t)lv_slider_get_value(lv_event_get_target(e));
-
-    /* First update the runtime state (same as the continuous callback) */
-    set_var_volume(val);
-
-    /* Then persist the final value to NVS */
-    ESP_LOGI("Screen", "Volume slider released – persisting %d%%", (int)val);
-    app_logic_persist_volume(val);
 }
 
 //
@@ -294,7 +248,7 @@ void create_screen_settings() {
         lv_obj_t *parent_obj = obj;
         {
             lv_obj_t *obj = lv_label_create(parent_obj);
-            lv_obj_set_pos(obj, 69, 9);
+            lv_obj_set_pos(obj, 69, 6);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_text_font(obj, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text_static(obj, "Settings");
@@ -303,17 +257,14 @@ void create_screen_settings() {
             // screen_brightness_slider
             lv_obj_t *obj = lv_slider_create(parent_obj);
             objects.screen_brightness_slider = obj;
-            lv_obj_set_pos(obj, 18, 85);
-            lv_obj_set_size(obj, 205, 10);
-            lv_slider_set_value(obj, get_var_screen_brightness(), LV_ANIM_OFF);
-            lv_obj_add_event_cb(obj, event_handler_cb_settings_screen_brightness_slider, LV_EVENT_ALL, 0);
-            lv_obj_set_style_bg_color(obj, lv_color_hex(0x1fea40), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-            lv_obj_set_style_bg_color(obj, lv_color_hex(0x1fea40), LV_PART_KNOB | LV_STATE_DEFAULT);
+            lv_obj_set_pos(obj, 36, 68);
+            lv_obj_set_size(obj, 187, 10);
+            lv_slider_set_value(obj, 25, LV_ANIM_OFF);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
         }
         {
             lv_obj_t *obj = lv_label_create(parent_obj);
-            lv_obj_set_pos(obj, 18, 59);
+            lv_obj_set_pos(obj, 36, 46);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_text_font(obj, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text_static(obj, "Screen Brightness");
@@ -322,18 +273,15 @@ void create_screen_settings() {
             // volume_slider
             lv_obj_t *obj = lv_slider_create(parent_obj);
             objects.volume_slider = obj;
-            lv_obj_set_pos(obj, 18, 138);
-            lv_obj_set_size(obj, 205, 10);
-            lv_slider_set_value(obj, get_var_volume(), LV_ANIM_OFF);
-            lv_obj_add_event_cb(obj, volume_slider_continuous_cb, LV_EVENT_VALUE_CHANGED, 0);
-            lv_obj_add_event_cb(obj, volume_slider_release_cb, LV_EVENT_RELEASED, 0);
-            lv_obj_set_style_bg_color(obj, lv_color_hex(0x1fea40), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-            lv_obj_set_style_bg_color(obj, lv_color_hex(0x1fea40), LV_PART_KNOB | LV_STATE_DEFAULT);
+            lv_obj_set_pos(obj, 36, 114);
+            lv_obj_set_size(obj, 187, 10);
+            lv_slider_set_value(obj, 25, LV_ANIM_OFF);
+            lv_obj_set_style_bg_color(obj, lv_color_hex(0x2196f3), LV_PART_INDICATOR | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_color(obj, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
         }
         {
             lv_obj_t *obj = lv_label_create(parent_obj);
-            lv_obj_set_pos(obj, 18, 112);
+            lv_obj_set_pos(obj, 36, 91);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_text_font(obj, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text_static(obj, "Volume");
@@ -342,9 +290,10 @@ void create_screen_settings() {
             // locker_lock
             lv_obj_t *obj = lv_button_create(parent_obj);
             objects.locker_lock = obj;
-            lv_obj_set_pos(obj, 18, 230);
+            lv_obj_set_pos(obj, 18, 266);
             lv_obj_set_size(obj, 92, 47);
             lv_obj_add_event_cb(obj, action_button_lock_pressed, LV_EVENT_PRESSED, (void *)0);
+            lv_obj_set_style_bg_color(obj, lv_color_hex(0x2196f3), LV_PART_MAIN | LV_STATE_DEFAULT);
             {
                 lv_obj_t *parent_obj = obj;
                 {
@@ -361,7 +310,7 @@ void create_screen_settings() {
             // locker_unlock
             lv_obj_t *obj = lv_button_create(parent_obj);
             objects.locker_unlock = obj;
-            lv_obj_set_pos(obj, 125, 231);
+            lv_obj_set_pos(obj, 125, 267);
             lv_obj_set_size(obj, 92, 47);
             lv_obj_add_event_cb(obj, action_button_unlock_pressed, LV_EVENT_PRESSED, (void *)0);
             {
@@ -376,6 +325,59 @@ void create_screen_settings() {
                 }
             }
         }
+        {
+            // locker_lock_1
+            lv_obj_t *obj = lv_button_create(parent_obj);
+            objects.locker_lock_1 = obj;
+            lv_obj_set_pos(obj, 18, 206);
+            lv_obj_set_size(obj, 92, 47);
+            lv_obj_add_event_cb(obj, action_button_reset_device_pressed, LV_EVENT_PRESSED, (void *)0);
+            lv_obj_set_style_bg_color(obj, lv_color_hex(0xf32121), LV_PART_MAIN | LV_STATE_DEFAULT);
+            {
+                lv_obj_t *parent_obj = obj;
+                {
+                    lv_obj_t *obj = lv_label_create(parent_obj);
+                    lv_obj_set_pos(obj, 0, 0);
+                    lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                    lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_text_font(obj, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_label_set_text_static(obj, "Reset");
+                }
+            }
+        }
+        {
+            // wifi_status
+            lv_obj_t *obj = lv_label_create(parent_obj);
+            objects.wifi_status = obj;
+            lv_obj_set_pos(obj, 40, 145);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_obj_set_style_text_font(obj, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_label_set_text(obj, "");
+        }
+        {
+            // wifi_logo
+            lv_obj_t *obj = lv_image_create(parent_obj);
+            objects.wifi_logo = obj;
+            lv_obj_set_pos(obj, 6, 140);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_image_set_src(obj, &img_wifi_bitmap);
+        }
+        {
+            // volume_logo
+            lv_obj_t *obj = lv_image_create(parent_obj);
+            objects.volume_logo = obj;
+            lv_obj_set_pos(obj, 6, 95);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_image_set_src(obj, &img_volume_bitmap);
+        }
+        {
+            // brightness_logo
+            lv_obj_t *obj = lv_image_create(parent_obj);
+            objects.brightness_logo = obj;
+            lv_obj_set_pos(obj, 6, 50);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_image_set_src(obj, &img_brightness_bitmap);
+        }
     }
     
     tick_screen_settings();
@@ -383,20 +385,11 @@ void create_screen_settings() {
 
 void tick_screen_settings() {
     {
-        int32_t new_val = get_var_screen_brightness();
-        int32_t cur_val = lv_slider_get_value(objects.screen_brightness_slider);
-        if (new_val != cur_val) {
-            tick_value_change_obj = objects.screen_brightness_slider;
-            lv_slider_set_value(objects.screen_brightness_slider, new_val, LV_ANIM_OFF);
-            tick_value_change_obj = NULL;
-        }
-    }
-    {
-        int32_t new_val = get_var_volume();
-        int32_t cur_val = lv_slider_get_value(objects.volume_slider);
-        if (new_val != cur_val) {
-            tick_value_change_obj = objects.volume_slider;
-            lv_slider_set_value(objects.volume_slider, new_val, LV_ANIM_OFF);
+        const char *new_val = get_var_wifi_status_str();
+        const char *cur_val = lv_label_get_text(objects.wifi_status);
+        if (strcmp(new_val, cur_val) != 0) {
+            tick_value_change_obj = objects.wifi_status;
+            lv_label_set_text(objects.wifi_status, new_val);
             tick_value_change_obj = NULL;
         }
     }

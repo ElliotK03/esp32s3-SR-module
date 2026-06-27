@@ -37,6 +37,7 @@ void stop_timer();
 static int32_t timer_arc_value = 0;
 static char display_tim_str[16] = "25:00";
 static char start_end_str[16] = "Start";
+static char wifi_status_str[50] = "WiFi not Connected!";
 
 // Pomodoro period (duration to set), in seconds
 static uint32_t pomo_tim_period_sec = 25 * 60;  // default 25 minutes
@@ -74,6 +75,19 @@ void set_var_start_end_str(const char *value) {
     }
     strncpy(start_end_str, value, sizeof(start_end_str) - 1);
     start_end_str[sizeof(start_end_str) - 1] = '\0';
+}
+
+const char *get_var_wifi_status_str() {
+    return wifi_status_str;
+}
+
+void set_var_wifi_status_str(const char *value) {
+    if (value == NULL) {
+        wifi_status_str[0] = '\0';
+        return;
+    }
+    strncpy(wifi_status_str, value, sizeof(wifi_status_str) - 1);
+    wifi_status_str[sizeof(wifi_status_str) - 1] = '\0';
 }
 
 static void update_pomo_period_display() {
@@ -385,6 +399,7 @@ void toggle_pomo_timer() {
 static void (*g_persist_volume_cb)(int32_t) = NULL;
 static void (*g_lock_cb)(void) = NULL;
 static void (*g_unlock_cb)(void) = NULL;
+static void (*g_reset_cb)(void) = NULL;
 
 void app_logic_register_persist_volume_cb(void (*cb)(int32_t)) {
     g_persist_volume_cb = cb;
@@ -403,6 +418,10 @@ void app_logic_register_lock_cb(void (*cb)(void)) {
 }
 
 void app_logic_register_unlock_cb(void (*cb)(void)) {
+    g_unlock_cb = cb;
+}
+
+void app_logic_register_reset_cb(void (*cb)(void)) {
     g_unlock_cb = cb;
 }
 
@@ -438,3 +457,14 @@ uint32_t get_pomo_period()
 {
     return pomo_tim_period_sec;
 }
+
+void action_button_reset_device_pressed(lv_event_t * e){
+    (void)e;
+    ESP_LOGI(TAG, "Reset button pressed");
+    if (g_reset_cb != NULL) {
+        g_reset_cb();
+    } else {
+        ESP_LOGW(TAG, "Reset callback not registered!");
+    }
+};
+

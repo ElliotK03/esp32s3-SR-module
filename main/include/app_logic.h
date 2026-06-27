@@ -55,10 +55,14 @@ void set_var_screen_brightness(int32_t value);
 int32_t get_var_volume();
 void set_var_volume(int32_t value);
 
+const char *get_var_wifi_status_str();
+void set_var_wifi_status_str(const char *value);
+
 void app_logic_register_persist_volume_cb(void (*cb)(int32_t));
 void app_logic_persist_volume(int32_t val);
 void app_logic_register_lock_cb(void (*cb)(void));
 void app_logic_register_unlock_cb(void (*cb)(void));
+void app_logic_register_reset_cb(void (*cb)(void));
 
 // Timer functions for external code
 void toggle_pomo_timer();
