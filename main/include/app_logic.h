@@ -65,6 +65,7 @@ void app_logic_register_brightness_released_cb(void (*cb)(int32_t));
 void app_logic_register_lock_cb(void (*cb)(void));
 void app_logic_register_unlock_cb(void (*cb)(void));
 void app_logic_register_reset_cb(void (*cb)(void));
+void app_logic_register_start_pairing_cb(void (*cb)(void));
 
 // Timer functions for external code
 void toggle_pomo_timer();
@@ -86,6 +87,7 @@ void action_button_minus_pressed(lv_event_t *e);
  * Start the pomodoro timer with selected period
  */
 void action_button_start_pomo_pressed(lv_event_t *e);
+void action_button_start_pairing_pressed(lv_event_t *e);
 
 
 /**

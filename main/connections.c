@@ -19,9 +19,11 @@
 #include "esp_http_client.h"
 #include "esp_sntp.h"
 #include "esp_timer.h"
+#include "esp_system.h"
 #include <time.h>
 #include <stdlib.h>
 
+#include "app_logic.h"
 #include "connections.h"
 
 extern const char google_root_ca_pem_start[] asm("_binary_google_root_ca_pem_start");
@@ -31,11 +33,26 @@ static const char *TAG = "provisioning";
 // Event bits
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
+#define START_PAIRING_BIT  BIT2
 static EventGroupHandle_t s_wifi_events;
 #define FIRESTORE_PROJECT_ID  "lock-in-81e21"
+#define FIREBASE_TASK_PRIORITY 2
+#define FIREBASE_TASK_STACK_SIZE (1024 * 5)
 static bool s_wifi_sta_netif_created = false;
 static bool s_wifi_ap_netif_created = false;
 static bool s_wifi_event_handlers_registered = false;
+static bool s_network_ready = false;
+static char s_active_ssid[64] = {0};
+static TaskHandle_t s_firebase_task_handle = NULL;
+
+#define WIFI_RETRY_DELAY_MS 5000
+
+static void update_wifi_status(const char *status) {
+    set_var_wifi_status_str(status ? status : "Not connected");
+}
+
+static void sync_time(void);
+static void firebase_task(void *arg);
 
 // ── NVS helpers ───────────────────────────────────────────────────────────
 
@@ -148,6 +165,7 @@ static void start_ap(void) {
     esp_wifi_set_mode(WIFI_MODE_AP);
     esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
     esp_wifi_start();
+    update_wifi_status("Pairing...");
     ESP_LOGI(TAG, "AP started → SSID: PomodoroTimer  IP: 192.168.4.1");
 }
 
@@ -206,7 +224,11 @@ static esp_err_t wifi_handler(httpd_req_t *req) {
 static httpd_handle_t start_http_server(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     httpd_handle_t server = NULL;
-    httpd_start(&server, &config);
+    esp_err_t err = httpd_start(&server, &config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "HTTP server start failed: %s", esp_err_to_name(err));
+        return NULL;
+    }
 
     httpd_uri_t status_uri = {
         .uri      = "/status",
@@ -224,22 +246,58 @@ static httpd_handle_t start_http_server(void) {
     return server;
 }
 
+static void run_pairing_session(char *ssid, char *password, size_t len) {
+    s_got_credentials = false;
+    memset(&s_pending_creds, 0, sizeof(s_pending_creds));
+
+    esp_wifi_disconnect();
+    esp_wifi_stop();
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    start_ap();
+    httpd_handle_t server = start_http_server();
+    if (server == NULL) {
+        update_wifi_status("Not connected");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Waiting for Wi-Fi credentials from app...");
+    while (!s_got_credentials) {
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
+    httpd_stop(server);
+    esp_wifi_stop();
+
+    strlcpy(ssid, s_pending_creds.ssid, len);
+    strlcpy(password, s_pending_creds.password, len);
+    nvs_save_credentials(ssid, password);
+    update_wifi_status("Not connected");
+    ESP_LOGI(TAG, "Pairing credentials received for SSID '%s'", ssid);
+}
+
 // ── STA mode (connect to home Wi-Fi) ─────────────────────────────────────
 
 static void sta_event_handler(void *arg, esp_event_base_t base,
                               int32_t id, void *data) {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
-        xEventGroupSetBits(s_wifi_events, WIFI_FAIL_BIT);
+        s_network_ready = false;
+        update_wifi_status("Not connected");
+        if (s_wifi_events != NULL) {
+            xEventGroupSetBits(s_wifi_events, WIFI_FAIL_BIT);
+        }
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)data;
         ESP_LOGI(TAG, "Connected! IP: " IPSTR, IP2STR(&event->ip_info.ip));
-        xEventGroupSetBits(s_wifi_events, WIFI_CONNECTED_BIT);
+        s_network_ready = true;
+        update_wifi_status(s_active_ssid);
+        if (s_wifi_events != NULL) {
+            xEventGroupSetBits(s_wifi_events, WIFI_CONNECTED_BIT);
+        }
     }
 }
 
-static bool connect_to_wifi(const char *ssid, const char *password) {
-    const int max_attempts = 3;
-
+static void ensure_sta_ready(void) {
     if (!s_wifi_sta_netif_created) {
         esp_netif_create_default_wifi_sta();
         s_wifi_sta_netif_created = true;
@@ -250,65 +308,120 @@ static bool connect_to_wifi(const char *ssid, const char *password) {
         esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, sta_event_handler, NULL);
         s_wifi_event_handlers_registered = true;
     }
+}
+
+static bool ssid_is_present(const char *ssid) {
+    wifi_scan_config_t scan_cfg = {
+        .ssid = (uint8_t *)ssid,
+        .show_hidden = true,
+    };
+
+    ESP_LOGI(TAG, "Scanning for saved SSID '%s'", ssid);
+    esp_err_t err = esp_wifi_scan_start(&scan_cfg, true);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Wi-Fi scan failed: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    uint16_t ap_count = 0;
+    err = esp_wifi_scan_get_ap_num(&ap_count);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Wi-Fi scan result count failed: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Scan found %u AP(s) matching '%s'", (unsigned)ap_count, ssid);
+    return ap_count > 0;
+}
+
+static bool connect_to_wifi_once(const char *ssid, const char *password) {
+    ensure_sta_ready();
+
+    if (s_wifi_events == NULL) {
+        ESP_LOGE(TAG, "Wi-Fi event group is not initialized");
+        return false;
+    }
 
     wifi_config_t sta_cfg = {0};
     strlcpy((char *)sta_cfg.sta.ssid, ssid, sizeof(sta_cfg.sta.ssid));
     strlcpy((char *)sta_cfg.sta.password, password, sizeof(sta_cfg.sta.password));
+    strlcpy(s_active_ssid, ssid, sizeof(s_active_ssid));
 
-    for (int attempt = 1; attempt <= max_attempts; ++attempt) {
-        s_wifi_events = xEventGroupCreate();
-        if (s_wifi_events == NULL) {
-            ESP_LOGE(TAG, "Failed to create Wi-Fi event group");
-            return false;
-        }
+    xEventGroupClearBits(s_wifi_events, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    s_network_ready = false;
+    update_wifi_status("Not connected");
 
-        ESP_LOGI(TAG, "Wi-Fi connect attempt %d/%d to SSID '%s'", attempt, max_attempts, ssid);
+    esp_wifi_disconnect();
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
+    esp_wifi_start();
+    esp_wifi_set_ps(WIFI_PS_NONE);
 
-        esp_wifi_disconnect();
-        esp_wifi_stop();
-        vTaskDelay(pdMS_TO_TICKS(200));
-
-        esp_wifi_set_mode(WIFI_MODE_STA);
-        esp_wifi_set_config(WIFI_IF_STA, &sta_cfg);
-        esp_wifi_start();
-        esp_wifi_set_ps(WIFI_PS_NONE); // Ensure radio stays awake
-        esp_wifi_connect();
-
-        EventBits_t bits = xEventGroupWaitBits(
-            s_wifi_events,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE, pdFALSE,
-            pdMS_TO_TICKS(15000)   // 15s timeout
-        );
-
-        vEventGroupDelete(s_wifi_events);
-        s_wifi_events = NULL;
-
-        if (bits & WIFI_CONNECTED_BIT) {
-            ESP_LOGI(TAG, "Wi-Fi connected on attempt %d", attempt);
-            return true;
-        }
-
-        ESP_LOGW(TAG, "Wi-Fi attempt %d failed; retrying", attempt);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+    if (!ssid_is_present(ssid)) {
+        ESP_LOGW(TAG, "Saved SSID '%s' not present; will keep scanning", ssid);
+        return false;
     }
 
+    ESP_LOGI(TAG, "Connecting to SSID '%s'", ssid);
+    xEventGroupClearBits(s_wifi_events, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    esp_wifi_connect();
+
+    EventBits_t bits = xEventGroupWaitBits(
+        s_wifi_events,
+        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+        pdTRUE, pdFALSE,
+        pdMS_TO_TICKS(15000)
+    );
+
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "Wi-Fi connected to '%s'", ssid);
+        return true;
+    }
+
+    ESP_LOGW(TAG, "Wi-Fi connection attempt failed for '%s'", ssid);
     return false;
 }
 
-// Button handling removed for boards without a dedicated reset button.
-// clear_credentials_and_reboot() retained if needed elsewhere.
-
-static void clear_credentials_and_reboot(void) {
-    ESP_LOGW(TAG, "Clearing saved credentials and rebooting into AP mode...");
-    nvs_handle_t h;
-    if (nvs_open("wifi_creds", NVS_READWRITE, &h) == ESP_OK) {
-        nvs_erase_all(h);
-        nvs_commit(h);
-        nvs_close(h);
+static void start_network_services(void) {
+    if (!s_network_ready) {
+        return;
     }
-    vTaskDelay(pdMS_TO_TICKS(500));
-    esp_restart();
+
+    sync_time();
+
+    if (s_firebase_task_handle == NULL) {
+        xTaskCreate(firebase_task, "firebase task", FIREBASE_TASK_STACK_SIZE, NULL, FIREBASE_TASK_PRIORITY, &s_firebase_task_handle);
+    }
+}
+
+static void connect_saved_wifi_loop(const char *ssid, const char *password) {
+    while (true) {
+        if (connect_to_wifi_once(ssid, password)) {
+            start_network_services();
+            while (s_network_ready) {
+                EventBits_t bits = xEventGroupWaitBits(
+                    s_wifi_events,
+                    WIFI_FAIL_BIT | START_PAIRING_BIT,
+                    pdTRUE, pdFALSE,
+                    pdMS_TO_TICKS(1000)
+                );
+
+                if (bits & START_PAIRING_BIT) {
+                    return;
+                }
+            }
+        }
+
+        EventBits_t bits = xEventGroupWaitBits(
+            s_wifi_events,
+            START_PAIRING_BIT,
+            pdTRUE, pdFALSE,
+            pdMS_TO_TICKS(WIFI_RETRY_DELAY_MS)
+        );
+        if (bits & START_PAIRING_BIT) {
+            return;
+        }
+    }
 }
 
 // ── NTP time sync ─────────────────────────────────────────────────────────
@@ -411,20 +524,36 @@ static void firestore_push_blink(int blink_count, bool led_on) {
     esp_http_client_cleanup(client);
 }
 
-#define FIREBASE_TASK_PRIORITY 2
-#define FIREBASE_TASK_STACK_SIZE (1024 * 5)
-
 // ── Blink task ────────────────────────────────────────────────────────────
 static void firebase_task(void *arg) {
 
     int blink_count = 0;
 
     while (true) {
+        if (!s_network_ready) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
         blink_count++;
         firestore_push_blink(blink_count, true);
         vTaskDelay(pdMS_TO_TICKS(5000));
 
     }
+}
+
+void connections_start_pairing(void) {
+    if (s_wifi_events == NULL) {
+        ESP_LOGW(TAG, "Pairing requested before Wi-Fi task initialized");
+        return;
+    }
+
+    update_wifi_status("Pairing...");
+    xEventGroupSetBits(s_wifi_events, START_PAIRING_BIT);
+}
+
+bool connections_is_network_ready(void) {
+    return s_network_ready;
 }
 
 void connections_init(void * arg) {
@@ -457,46 +586,33 @@ void connections_init(void * arg) {
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&cfg);
+    s_wifi_events = xEventGroupCreate();
+    if (s_wifi_events == NULL) {
+        ESP_LOGE(TAG, "Failed to create Wi-Fi event group");
+        vTaskDelete(NULL);
+        return;
+    }
 
-    // Check NVS for saved credentials first
     char saved_ssid[64] = {0};
     char saved_pass[64] = {0};
-    if (nvs_load_credentials(saved_ssid, saved_pass, sizeof(saved_ssid))) {
-        ESP_LOGI(TAG, "Found saved credentials, connecting to: %s", saved_ssid);
-        if (connect_to_wifi(saved_ssid, saved_pass)) {
-            ESP_LOGI(TAG, "Connected with saved credentials — starting main app");
-            sync_time();
-            xTaskCreate(firebase_task, "firebase task", FIREBASE_TASK_STACK_SIZE, NULL, FIREBASE_TASK_PRIORITY, NULL);
-            vTaskDelete(NULL);
-            return;
+    bool has_saved_credentials = nvs_load_credentials(saved_ssid, saved_pass, sizeof(saved_ssid));
+    update_wifi_status("Not connected");
+
+    while (true) {
+        if (has_saved_credentials) {
+            ESP_LOGI(TAG, "Saved credentials found; scanning/retrying SSID '%s'", saved_ssid);
+            connect_saved_wifi_loop(saved_ssid, saved_pass);
+        } else {
+            ESP_LOGI(TAG, "No saved Wi-Fi credentials; waiting for GUI pairing request");
+            xEventGroupWaitBits(
+                s_wifi_events,
+                START_PAIRING_BIT,
+                pdTRUE, pdFALSE,
+                portMAX_DELAY
+            );
         }
-        ESP_LOGW(TAG, "Saved credentials failed, falling back to AP mode");
+
+        run_pairing_session(saved_ssid, saved_pass, sizeof(saved_ssid));
+        has_saved_credentials = saved_ssid[0] != '\0';
     }
-
-    // No credentials or failed → start AP provisioning
-    start_ap();
-    httpd_handle_t server = start_http_server();
-
-    ESP_LOGI(TAG, "Waiting for Wi-Fi credentials from app...");
-    while (!s_got_credentials) {
-        vTaskDelay(pdMS_TO_TICKS(200));
-    }
-
-    httpd_stop(server);
-    esp_wifi_stop();
-
-    ESP_LOGI(TAG, "Got credentials → SSID: %s", s_pending_creds.ssid);
-    nvs_save_credentials(s_pending_creds.ssid, s_pending_creds.password);
-
-    if (connect_to_wifi(s_pending_creds.ssid, s_pending_creds.password)) {
-        ESP_LOGI(TAG, "Provisioning complete!");
-        sync_time();                                    
-        
-        // Blink task removed (no onboard LED on this board)
-    } else {
-        ESP_LOGE(TAG, "Connection failed — rebooting into AP mode");
-        esp_restart();
-    }
-    
-    vTaskDelete(NULL);
 }

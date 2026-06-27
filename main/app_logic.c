@@ -15,6 +15,7 @@ static void (*g_persist_brightness_cb)(int32_t) = NULL;
 static void (*g_lock_cb)(void) = NULL;
 static void (*g_unlock_cb)(void) = NULL;
 static void (*g_reset_cb)(void) = NULL;
+static void (*g_start_pairing_cb)(void) = NULL;
 static void (*g_volume_release)(int32_t) = NULL;
 static void (*g_brightness_release)(int32_t) = NULL;
 
@@ -44,7 +45,7 @@ void stop_timer();
 static int32_t timer_arc_value = 0;
 static char display_tim_str[16] = "25:00";
 static char start_end_str[16] = "Start";
-static char wifi_status_str[50] = "WiFi not Connected!";
+static char wifi_status_str[50] = "Not connected";
 
 // Pomodoro period (duration to set), in seconds
 static uint32_t pomo_tim_period_sec = 25 * 60;  // default 25 minutes
@@ -422,6 +423,10 @@ void app_logic_register_reset_cb(void (*cb)(void)) {
     g_reset_cb = cb;
 }
 
+void app_logic_register_start_pairing_cb(void (*cb)(void)) {
+    g_start_pairing_cb = cb;
+}
+
 void app_logic_register_volume_released_cb(void (*cb)(int32_t)) {
     g_volume_release = cb;
 }
@@ -473,6 +478,16 @@ void action_button_reset_device_pressed(lv_event_t * e){
     }
 };
 
+void action_button_start_pairing_pressed(lv_event_t * e){
+    (void)e;
+    ESP_LOGI(TAG, "Start pairing button pressed");
+    if (g_start_pairing_cb != NULL) {
+        g_start_pairing_cb();
+    } else {
+        ESP_LOGW(TAG, "Start pairing callback not registered!");
+    }
+}
+
 void action_slider_volume_released(lv_event_t * e){
     ESP_LOGI(TAG, "Volume slider released, writing to NVS flash");
     g_volume_release(volume_value);
@@ -481,4 +496,3 @@ void action_slider_volume_released(lv_event_t * e){
 void action_slider_brightness_released(lv_event_t * e){
     g_brightness_release(screen_brightness);
 }
-

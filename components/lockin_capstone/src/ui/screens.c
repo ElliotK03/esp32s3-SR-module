@@ -350,9 +350,9 @@ void create_screen_settings() {
             }
         }
         {
-            // locker_lock_1
+            // reset_button
             lv_obj_t *obj = lv_button_create(parent_obj);
-            objects.locker_lock_1 = obj;
+            objects.reset_button = obj;
             lv_obj_set_pos(obj, 18, 206);
             lv_obj_set_size(obj, 92, 47);
             lv_obj_add_event_cb(obj, action_button_reset_device_pressed, LV_EVENT_PRESSED, (void *)0);
@@ -401,6 +401,25 @@ void create_screen_settings() {
             lv_obj_set_pos(obj, 6, 50);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_image_set_src(obj, &img_brightness_bitmap);
+        }
+        {
+            // pair_button
+            lv_obj_t *obj = lv_button_create(parent_obj);
+            objects.pair_button = obj;
+            lv_obj_set_pos(obj, 126, 206);
+            lv_obj_set_size(obj, 92, 47);
+            lv_obj_add_event_cb(obj, action_button_start_pairing_pressed, LV_EVENT_PRESSED, (void *)0);
+            {
+                lv_obj_t *parent_obj = obj;
+                {
+                    lv_obj_t *obj = lv_label_create(parent_obj);
+                    lv_obj_set_pos(obj, 0, 0);
+                    lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                    lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_text_font(obj, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_label_set_text_static(obj, "Pair");
+                }
+            }
         }
     }
     

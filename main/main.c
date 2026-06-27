@@ -504,6 +504,7 @@ void app_main() {
     app_logic_register_lock_cb(motor_lock);
     app_logic_register_unlock_cb(motor_unlock);
     app_logic_register_reset_cb(reset_device_callback);
+    app_logic_register_start_pairing_cb(connections_start_pairing);
     app_logic_register_persist_brightness_cb(set_backlight_brightness);
 
     // NVS writing callbacks
