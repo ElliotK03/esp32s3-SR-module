@@ -11,6 +11,11 @@
 #include <string.h>
 #include <time.h>
 
+static void (*g_persist_volume_cb)(int32_t) = NULL;
+static void (*g_lock_cb)(void) = NULL;
+static void (*g_unlock_cb)(void) = NULL;
+static void (*g_reset_cb)(void) = NULL;
+
 void app_logic_set_work_duration(uint32_t secs);
 static const char *TAG = "APP_LOGIC";
 
@@ -382,6 +387,7 @@ void set_var_volume(int32_t value) {
     if (value < 0) value = 0;
     if (value > 100) value = 100;
     volume_value = value;
+    g_persist_volume_cb(volume_value);
     ESP_LOGI(TAG, "Volume updated to %d%%", (int)volume_value);
 }
 
@@ -395,11 +401,6 @@ void toggle_pomo_timer() {
         start_timer(pomo_tim_period_sec);
     }
 }
-
-static void (*g_persist_volume_cb)(int32_t) = NULL;
-static void (*g_lock_cb)(void) = NULL;
-static void (*g_unlock_cb)(void) = NULL;
-static void (*g_reset_cb)(void) = NULL;
 
 void app_logic_register_persist_volume_cb(void (*cb)(int32_t)) {
     g_persist_volume_cb = cb;

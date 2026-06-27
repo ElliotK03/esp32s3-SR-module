@@ -514,7 +514,7 @@ void motor_task(void *arg){
 }
 
 static void persist_volume_wrapper(int32_t val) {
-    settings_manager_set_volume((uint8_t)val);
+    // settings_manager_set_volume((uint8_t)val);
 }
 
 static TaskHandle_t motor_run_task_handle = NULL;
