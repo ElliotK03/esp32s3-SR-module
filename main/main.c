@@ -15,13 +15,12 @@
 #include "esp_system.h"
 #include "driver/i2c_master.h"
 #include "driver/gpio.h"
-#include "driver/mcpwm_prelude.h"
-#include "driver/ledc.h"
 #include "hal/gpio_types.h"
 
 #include "nvs_helper.h"
 #include "pinout.h"
 #include "audio-sr.h"
+#include "backlight.h"
 #include "settings_manager.h"
 #include "st7789.h"
 #include "lvgl.h"
@@ -30,27 +29,21 @@
 #include "app_logic.h"
 #include "connections.h"
 #include "i2c_handlers.h"
+#include "motor_control.h"
 
 #define ENABLE_AUDIO_SR 1
 #define SUSPEND_AUDIO_GPIO 0
 #define ENABLE_DEBUG_MEM 0
 
 static void display_task(void *arg);
-void set_backlight_brightness(int32_t percent);
 
 static const char *TAG_DISPLAY = "ST7789";
 static const char *TAG_TOUCH = "FT6236";
-static const char *TAG_MOTOR = "motor";
-static const char *TAG_BACKLIGHT = "backlight";
 static const char *TAG_MAIN = "app_main";
 static const char *TAG_MEM = "memory";
 
-static volatile bool g_gui_ready = false;
-
 #define DISPLAY_TASK_STACK_SIZE  (10 * 1024)
 #define DISPLAY_TASK_PRIORITY    10
-#define MOTOR_TASK_STACK_SIZE 4096
-#define MOTOR_TASK_PRIORITY    2
 #define CONNECTIONS_TASK_STACK_SIZE  (7 * 1024)
 #define CONNECTIONS_TASK_PRIORITY    2
 
@@ -349,9 +342,6 @@ static void display_task(void *arg)
     // Initialize app logic (pomodoro period display, etc.)
     app_logic_init();
 
-    // Notify that the GUI has finished initialization
-    g_gui_ready = true;
-
     set_backlight_brightness(get_var_screen_brightness_val());
 
     // Main LVGL loop
@@ -362,157 +352,6 @@ static void display_task(void *arg)
         lv_tick_inc(10);
     }
 }
-
-#define TIMER_RESOLUTION 80000000 // 80Mhz which is half of the 160Mhz source used
-#define COUNTER_PERIOD 8000 // 8000 ticks for 10kHz PWM
-
-mcpwm_cmpr_handle_t cmp_m_a_h, cmp_m_a_l, cmp_m_b_h, cmp_m_b_l;
-mcpwm_gen_handle_t gen_m_a_h, gen_m_a_l, gen_m_b_h, gen_m_b_l;
-
-void motor_brake(){
-    //     // Braking
-    //     gpio_set_level(MOTOR_B_L, 1);
-    //     gpio_set_level(MOTOR_A_H, 0);
-    //     gpio_set_level(MOTOR_B_H, 0);
-    //     gpio_set_level(MOTOR_A_L, 1);
-    mcpwm_comparator_set_compare_value(cmp_m_a_h, 0);
-    mcpwm_comparator_set_compare_value(cmp_m_b_h, 0);
-    mcpwm_comparator_set_compare_value(cmp_m_b_l, COUNTER_PERIOD);
-    mcpwm_comparator_set_compare_value(cmp_m_a_l, COUNTER_PERIOD);
-}
-
-void motor_turn_cw(uint32_t cmpr_value){
-    if (cmpr_value > COUNTER_PERIOD){
-        cmpr_value = COUNTER_PERIOD;
-    }
-
-    mcpwm_comparator_set_compare_value(cmp_m_a_h, cmpr_value);
-    mcpwm_comparator_set_compare_value(cmp_m_b_h, 0);
-    mcpwm_comparator_set_compare_value(cmp_m_b_l, cmpr_value);
-    mcpwm_comparator_set_compare_value(cmp_m_a_l, 0);   
-}
-
-void motor_turn_ccw(uint32_t cmpr_value){
-    if (cmpr_value > COUNTER_PERIOD){
-        cmpr_value = COUNTER_PERIOD;
-    }
-
-    mcpwm_comparator_set_compare_value(cmp_m_a_h, 0);
-    mcpwm_comparator_set_compare_value(cmp_m_b_h, cmpr_value);
-    mcpwm_comparator_set_compare_value(cmp_m_b_l, 0);
-    mcpwm_comparator_set_compare_value(cmp_m_a_l, cmpr_value);   
-}
-
-void motor_task(void *arg){
-
-    mcpwm_timer_handle_t timer0 = NULL;
-    mcpwm_timer_config_t timer0_config = {
-        .group_id = 0,
-        .clk_src = MCPWM_TIMER_CLK_SRC_PLL160M, // 160Mhz default clock source
-        .resolution_hz = TIMER_RESOLUTION,
-        .count_mode = MCPWM_TIMER_COUNT_MODE_UP, //Count up down for symetric waveform to reduce harmonics when driving DC motors
-        .period_ticks = COUNTER_PERIOD
-    };
-
-    mcpwm_new_timer(&timer0_config, &timer0);
-
-    // Configure mcpwm operator
-    mcpwm_oper_handle_t operator0 = NULL, operator1 = NULL;
-    mcpwm_operator_config_t operator_config = {
-        .group_id = 0,
-    };
-    mcpwm_new_operator(&operator_config, &operator0);
-    mcpwm_new_operator(&operator_config, &operator1);
-    mcpwm_operator_connect_timer(operator0, timer0);
-    mcpwm_operator_connect_timer(operator1, timer0);
-
-    // Configure mcpwm comparator
-    // m_a_h & m_b_l -> operator0
-    // m_a_l & m_b_h -> operator1
-
-    mcpwm_comparator_config_t comparator_config = {
-        .flags.update_cmp_on_tep = true
-    };
-    
-    mcpwm_new_comparator(operator0, &comparator_config, &cmp_m_a_h);
-    mcpwm_new_comparator(operator0, &comparator_config, &cmp_m_b_l);
-    mcpwm_new_comparator(operator1, &comparator_config, &cmp_m_a_l);
-    mcpwm_new_comparator(operator1, &comparator_config, &cmp_m_b_h);
-
-    mcpwm_generator_config_t gen_m_a_h_config = {.gen_gpio_num = MOTOR_A_H};
-    mcpwm_generator_config_t gen_m_a_l_config = {.gen_gpio_num = MOTOR_A_L};
-    mcpwm_generator_config_t gen_m_b_h_config = {.gen_gpio_num = MOTOR_B_H};
-    mcpwm_generator_config_t gen_m_b_l_config = {.gen_gpio_num = MOTOR_B_L};
-
-    mcpwm_new_generator(operator0, &gen_m_a_h_config, &gen_m_a_h);
-    mcpwm_new_generator(operator0, &gen_m_b_l_config, &gen_m_b_l);
-    mcpwm_new_generator(operator1, &gen_m_a_l_config, &gen_m_a_l);
-    mcpwm_new_generator(operator1, &gen_m_b_h_config, &gen_m_b_h);
-
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_timer_event(gen_m_a_h,
-                    MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH)));
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_compare_event(gen_m_a_h,
-                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, cmp_m_a_h, MCPWM_GEN_ACTION_LOW)));
-    
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_timer_event(gen_m_a_l,
-                    MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH)));
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_compare_event(gen_m_a_l,
-                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, cmp_m_a_l, MCPWM_GEN_ACTION_LOW)));
-    
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_timer_event(gen_m_b_h,
-                    MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH)));
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_compare_event(gen_m_b_h,
-                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, cmp_m_b_h, MCPWM_GEN_ACTION_LOW)));
-    
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_timer_event(gen_m_b_l,
-                    MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH)));
-    ESP_ERROR_CHECK(mcpwm_generator_set_action_on_compare_event(gen_m_b_l,
-                    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, cmp_m_b_l, MCPWM_GEN_ACTION_LOW)));
-
-    mcpwm_dead_time_config_t dead_time_config = {
-        .posedge_delay_ticks = 50,
-        .negedge_delay_ticks = 0,
-    };
-    // apply deadtime to gen_m_b_l and gen_m_a_l
-    ESP_ERROR_CHECK(mcpwm_generator_set_dead_time(gen_m_b_l, gen_m_b_l, &dead_time_config));
-    ESP_ERROR_CHECK(mcpwm_generator_set_dead_time(gen_m_a_l, gen_m_a_l, &dead_time_config));
-
-    // bypass deadtime module for gen_m_a_h and gen_m_b_h
-    dead_time_config.posedge_delay_ticks = 0;
-    ESP_ERROR_CHECK(mcpwm_generator_set_dead_time(gen_m_b_h, gen_m_b_h, &dead_time_config));
-    ESP_ERROR_CHECK(mcpwm_generator_set_dead_time(gen_m_a_h, gen_m_a_h, &dead_time_config));
-    
-    mcpwm_comparator_set_compare_value(cmp_m_a_h, 0);
-    mcpwm_comparator_set_compare_value(cmp_m_a_l, 0);
-    mcpwm_comparator_set_compare_value(cmp_m_b_h, 0);
-    mcpwm_comparator_set_compare_value(cmp_m_b_l, 0);
-
-    mcpwm_timer_enable(timer0);
-    mcpwm_timer_start_stop(timer0, MCPWM_TIMER_START_NO_STOP);
-
-    // vTaskDelete(NULL);
-
-    // while(1){
-    //     for(int i = 1000; i <= 8000; i += 1000){
-    //         motor_turn_ccw(i);
-    //         vTaskDelay(pdMS_TO_TICKS(1000));
-            
-    //         motor_brake();
-    //         vTaskDelay(pdMS_TO_TICKS(1000));
-
-    //         motor_turn_cw(i);
-    //         vTaskDelay(pdMS_TO_TICKS(1000));
-
-    //         motor_brake();
-    //         vTaskDelay(pdMS_TO_TICKS(1000));
-
-    //         // ESP_LOGI(TAG_MOTOR, "compare value i = %d", i);
-    //     }
-
-    //     // vTaskDelay(portMAX_DELAY);
-    // }
-}
-
 
 /* NVS Writing Callbacks START */
 
@@ -552,105 +391,8 @@ static void set_brightness_nvs_callback(int32_t brightness){
 
 /* NVS Writing Callbacks END*/
 
-static TaskHandle_t motor_run_task_handle = NULL;
-
-static void motor_run_timer_task(void *pvParameters) {
-    int dir = (int)pvParameters; // 1 = CW (lock), 2 = CCW (unlock)
-    if (dir == 1) {
-        ESP_LOGI(TAG_MOTOR, "Turning motor CW (Lock) for 3 seconds...");
-        motor_turn_cw(COUNTER_PERIOD);
-    } else {
-        ESP_LOGI(TAG_MOTOR, "Turning motor CCW (Unlock) for 3 seconds...");
-        motor_turn_ccw(COUNTER_PERIOD);
-    }
-    
-    vTaskDelay(pdMS_TO_TICKS(3000));
-    
-    ESP_LOGI(TAG_MOTOR, "Braking motor...");
-    motor_brake();
-    
-    motor_run_task_handle = NULL;
-    vTaskDelete(NULL);
-}
-
-static void trigger_motor_run(int dir) {
-    if (motor_run_task_handle != NULL) {
-        vTaskDelete(motor_run_task_handle);
-        motor_brake();
-        motor_run_task_handle = NULL;
-    }
-    xTaskCreate(motor_run_timer_task, "motor_run_timer_task", 2048, (void *)dir, 2, &motor_run_task_handle);
-}
-
-static void motor_lock_cb(void) {
-    trigger_motor_run(1);
-}
-
-static void motor_unlock_cb(void) {
-    trigger_motor_run(2);
-}
-
 static void reset_device_callback(void){
     // TODO: Implement device wifi reset code
-}
-
-static volatile bool g_backlight_init = false;
-
-void set_backlight_brightness(int32_t percent) {
-    if (!g_backlight_init) {
-        return;
-    }
-
-    if (percent < 5) percent = 5;
-    if (percent > 100) percent = 100;
-
-    uint32_t duty = (percent * 1023) / 100;
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-
-    ESP_LOGI(TAG_BACKLIGHT, "Brightness updated to %d%% (duty: %lu)", (int)percent, (unsigned long)duty);
-}
-
-void backlight_task(void *pvParameters) {
-    // Wait for display_task to finish initializing GUI
-    // while (!g_gui_ready) {
-    //     vTaskDelay(pdMS_TO_TICKS(50));
-    // }
-    // ESP_LOGI(TAG_BACKLIGHT, "GUI is ready! Initializing LEDC Backlight PWM on GPIO %d...", LCD_BL);
-
-    // Configure LEDC Timer
-    ledc_timer_config_t ledc_timer = {
-        .speed_mode       = LEDC_LOW_SPEED_MODE,
-        .timer_num        = LEDC_TIMER_0,
-        .duty_resolution  = LEDC_TIMER_10_BIT, // 10-bit resolution (0-1023)
-        .freq_hz          = 1000,              // 1 kHz frequency
-        .clk_cfg          = LEDC_AUTO_CLK
-    };
-    ledc_timer_config(&ledc_timer);
-
-    // Configure LEDC Channel
-    int32_t initial_brightness = get_var_screen_brightness_val();
-    uint32_t duty = (initial_brightness * 1023) / 100;
-    ledc_channel_config_t ledc_channel = {
-        .speed_mode     = LEDC_LOW_SPEED_MODE,
-        .channel        = LEDC_CHANNEL_0,
-        .timer_sel      = LEDC_TIMER_0,
-        .intr_type      = LEDC_INTR_DISABLE,
-        .gpio_num       = LCD_BL,
-        .duty           = duty,
-        .hpoint         = 0
-    };
-    ledc_channel_config(&ledc_channel);
-
-    // ESP_LOGI(TAG_BACKLIGHT, "Brightness set to initial %d%% (duty: %lu)", (int)initial_brightness, (unsigned long)duty);
-    
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-
-    g_backlight_init = true;
-
-    // Deleting the task as we no longer need to update the duty cycle
-    // vTaskDelete(NULL);
 }
 
 void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
@@ -751,16 +493,16 @@ void app_main() {
     xTaskCreatePinnedToCore(connections_init, "connection_task", CONNECTIONS_TASK_STACK_SIZE, NULL, CONNECTIONS_TASK_PRIORITY, NULL, 0);
 
     // Initialize peripherals
-    motor_task(NULL);
-    backlight_task(NULL);
+    motor_init();
+    backlight_init(0);
 
 #if ENABLE_DEBUG_MEM
     xTaskCreate(debug_mem_task, "debug_mem_task", 4096, NULL, 4, NULL);
 #endif
 
     // Register UI logic callbacks
-    app_logic_register_lock_cb(motor_lock_cb);
-    app_logic_register_unlock_cb(motor_unlock_cb);
+    app_logic_register_lock_cb(motor_lock);
+    app_logic_register_unlock_cb(motor_unlock);
     app_logic_register_reset_cb(reset_device_callback);
     app_logic_register_persist_brightness_cb(set_backlight_brightness);
 

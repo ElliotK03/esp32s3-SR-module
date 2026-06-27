@@ -30,7 +30,9 @@ set(srcs
     screen_swipe.c
     st7789.c 
     app_logic.c 
+    backlight.c
     connections.c
+    motor_control.c
     settings_manager.c
 )
 

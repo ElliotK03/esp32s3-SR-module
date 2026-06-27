@@ -419,7 +419,7 @@ void app_logic_register_unlock_cb(void (*cb)(void)) {
 }
 
 void app_logic_register_reset_cb(void (*cb)(void)) {
-    g_unlock_cb = cb;
+    g_reset_cb = cb;
 }
 
 void app_logic_register_volume_released_cb(void (*cb)(int32_t)) {
