@@ -37,6 +37,9 @@ void settings_manager_init(void) {
   apply_voice_settings(&cached_settings.voice);
   apply_pomodoro_settings(&cached_settings.pomodoro);
 
+  ESP_LOGI(TAG, "Volume: %" PRIu8, cached_settings.voice.volume);
+  ESP_LOGI(TAG, "Brightness: %" PRId32, cached_settings.brightness);
+  
   // Experimental, updating the values displayed by LVGL so value is correct on startup
   set_var_volume(cached_settings.voice.volume);
   set_var_screen_brightness_val(cached_settings.brightness);
