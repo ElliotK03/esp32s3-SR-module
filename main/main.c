@@ -134,7 +134,7 @@ static bool tp_read_point(uint16_t *x, uint16_t *y) {
     // Extract X and Y
     *x = ((data[1] & 0x0F) << 8) | data[2];
     *y = ((data[3] & 0x0F) << 8) | data[4];
-    ESP_LOGI(TAG_TOUCH, "X: %u, Y: %u", *x, *y);
+    ESP_LOGD(TAG_TOUCH, "X: %u, Y: %u", *x, *y);
     touch_data_ready = false;
     
     return true;
@@ -728,7 +728,7 @@ void app_main() {
     app_logic_register_lock_cb(motor_lock_cb);
     app_logic_register_unlock_cb(motor_unlock_cb);
     app_logic_register_reset_cb(reset_device_callback);
-    
+    app_logic_register_persist_brightness_cb(set_backlight_brightness);
     settings_manager_init();
 
     // Initiate audio pipeline

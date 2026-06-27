@@ -12,6 +12,7 @@
 #include <time.h>
 
 static void (*g_persist_volume_cb)(int32_t) = NULL;
+static void (*g_persist_brightness_cb)(int32_t) = NULL;
 static void (*g_lock_cb)(void) = NULL;
 static void (*g_unlock_cb)(void) = NULL;
 static void (*g_reset_cb)(void) = NULL;
@@ -367,13 +368,15 @@ int32_t get_var_screen_brightness_val() {
     return screen_brightness;
 }
 
-extern void set_backlight_brightness(int32_t percent);
-
 void set_var_screen_brightness_val(int32_t value) {
     if (value < 0) value = 0;
     if (value > 100) value = 100;
+
+    
     screen_brightness = value;
-    set_backlight_brightness(screen_brightness);
+    
+    // Call the screen brightness callback registered in main.c
+    g_persist_brightness_cb(value);
 }
 
 // ============= Volume Variable =============
@@ -387,7 +390,10 @@ void set_var_volume(int32_t value) {
     if (value < 0) value = 0;
     if (value > 100) value = 100;
     volume_value = value;
+
+    // Call the callback registered in main.c
     g_persist_volume_cb(volume_value);
+
     ESP_LOGI(TAG, "Volume updated to %d%%", (int)volume_value);
 }
 
@@ -406,12 +412,8 @@ void app_logic_register_persist_volume_cb(void (*cb)(int32_t)) {
     g_persist_volume_cb = cb;
 }
 
-void app_logic_persist_volume(int32_t val) {
-    if (g_persist_volume_cb != NULL) {
-        g_persist_volume_cb(val);
-    } else {
-        ESP_LOGW(TAG, "Persist volume callback not registered!");
-    }
+void app_logic_register_persist_brightness_cb(void (*cb)(int32_t)) {
+    g_persist_brightness_cb = cb;
 }
 
 void app_logic_register_lock_cb(void (*cb)(void)) {
