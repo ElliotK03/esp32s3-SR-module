@@ -18,6 +18,7 @@ set(requires
     cjson
     esp_http_server
     esp_http_client
+    esp-tls
     esp_driver_ledc
 )
 
@@ -38,5 +39,4 @@ set(srcs
 
 idf_component_register(SRCS ${srcs}
                        REQUIRES ${requires}
-                       EMBED_TXTFILES "certs/google_root_ca.pem"
                        INCLUDE_DIRS "." "include")

@@ -16,6 +16,7 @@
 #include "nvs.h"
 #include "cJSON.h"
 #include "driver/gpio.h"
+#include "esp_crt_bundle.h"
 #include "esp_http_client.h"
 #include "esp_sntp.h"
 #include "esp_timer.h"
@@ -26,8 +27,6 @@
 #include "app_logic.h"
 #include "connections.h"
 
-extern const char google_root_ca_pem_start[] asm("_binary_google_root_ca_pem_start");
-extern const char google_root_ca_pem_end[]   asm("_binary_google_root_ca_pem_end");
 static const char *TAG = "provisioning";
 
 // Event bits
@@ -500,12 +499,12 @@ static void firestore_push_blink(int blink_count, bool led_on) {
         "/databases/(default)/documents/diagnostics",
         FIRESTORE_PROJECT_ID);
 
-    // 6. HTTP POST CONFIGURATION (FIXED: Using crt_bundle_attach and 20s timeout)
+    // 6. HTTP POST CONFIGURATION
     esp_http_client_config_t config = {
         .url               = url,
         .method            = HTTP_METHOD_POST,
         .timeout_ms        = 20000,
-        .cert_pem          = google_root_ca_pem_start,
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
