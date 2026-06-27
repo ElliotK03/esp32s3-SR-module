@@ -172,6 +172,14 @@
         "defaultValue": "\"\"",
         "persistent": false,
         "native": false
+      },
+      {
+        "objID": "b27702fb-0977-4e89-82bd-7e3b56f138f6",
+        "name": "screen_brightness_val",
+        "type": "integer",
+        "defaultValue": "0",
+        "persistent": false,
+        "native": false
       }
     ],
     "structures": [],
@@ -1185,8 +1193,8 @@
               "max": 100,
               "maxType": "literal",
               "mode": "NORMAL",
-              "value": 25,
-              "valueType": "literal",
+              "value": "screen_brightness_val",
+              "valueType": "expression",
               "previewValue": 25,
               "valueLeft": 0,
               "valueLeftType": "literal",

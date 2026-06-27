@@ -358,13 +358,13 @@ void set_var_day_str(const char *value) {
 // ============= Screen Brightness Variable =============
 static int32_t screen_brightness = 70; // Default to 70%
 
-int32_t get_var_screen_brightness() {
+int32_t get_var_screen_brightness_val() {
     return screen_brightness;
 }
 
 extern void set_backlight_brightness(int32_t percent);
 
-void set_var_screen_brightness(int32_t value) {
+void set_var_screen_brightness_val(int32_t value) {
     if (value < 0) value = 0;
     if (value > 100) value = 100;
     screen_brightness = value;

@@ -594,7 +594,7 @@ void backlight_task(void *pvParameters) {
     ledc_timer_config(&ledc_timer);
 
     // Configure LEDC Channel
-    int32_t initial_brightness = get_var_screen_brightness();
+    int32_t initial_brightness = get_var_screen_brightness_val();
     uint32_t duty = (initial_brightness * 1023) / 100;
     ledc_channel_config_t ledc_channel = {
         .speed_mode     = LEDC_LOW_SPEED_MODE,

@@ -50,8 +50,8 @@ const char *get_var_display_tim_str();
 void set_var_display_tim_str(const char *value);
 const char *get_var_start_end_str();
 void set_var_start_end_str(const char *value);
-int32_t get_var_screen_brightness();
-void set_var_screen_brightness(int32_t value);
+int32_t get_var_screen_brightness_val();
+void set_var_screen_brightness_val(int32_t value);
 int32_t get_var_volume();
 void set_var_volume(int32_t value);
 
