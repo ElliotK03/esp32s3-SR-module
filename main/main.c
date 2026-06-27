@@ -532,7 +532,7 @@ static void set_volume_nvs_callback(int32_t volume_value){
 
     // Set the current volume
     set_output_vol(temp_vol);
-    xTaskCreate(write_nvs_volume_task, "Write volume NVS task", 2048, NULL, 5, NULL);
+    xTaskCreate(write_nvs_volume_task, "Write volume NVS task", 3000, NULL, 5, NULL);
 }
 
 // This variable has to be placed in DRAM
@@ -547,7 +547,7 @@ void write_nvs_brightness_task(void * args){
 // Write volume setting to NVS
 static void set_brightness_nvs_callback(int32_t brightness){
     temp_bri = brightness;
-    xTaskCreate(write_nvs_volume_task, "Write brightness NVS task", 2048, NULL, 5, NULL);
+    xTaskCreate(write_nvs_brightness_task, "Write brightness NVS task", 3000, NULL, 5, NULL);
 }
 
 /* NVS Writing Callbacks END*/
