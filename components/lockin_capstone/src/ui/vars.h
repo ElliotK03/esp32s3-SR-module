@@ -21,7 +21,8 @@ enum FlowGlobalVariables {
     FLOW_GLOBAL_VARIABLE_DAY_STR = 5,
     FLOW_GLOBAL_VARIABLE_WIFI_STATUS_STR = 6,
     FLOW_GLOBAL_VARIABLE_SCREEN_BRIGHTNESS_VAL = 7,
-    FLOW_GLOBAL_VARIABLE_VOLUME = 8
+    FLOW_GLOBAL_VARIABLE_VOLUME = 8,
+    FLOW_GLOBAL_VARIABLE_SESSION_START_STOP_BUTTON_STR = 9
 };
 
 // Native global variables
@@ -44,6 +45,8 @@ extern int32_t get_var_screen_brightness_val();
 extern void set_var_screen_brightness_val(int32_t value);
 extern int32_t get_var_volume();
 extern void set_var_volume(int32_t value);
+extern const char *get_var_session_start_stop_button_str();
+extern void set_var_session_start_stop_button_str(const char *value);
 
 #ifdef __cplusplus
 }

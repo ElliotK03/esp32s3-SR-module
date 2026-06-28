@@ -24,10 +24,11 @@ typedef struct _objects_t {
     lv_obj_t *alarm;
     lv_obj_t *settings;
     lv_obj_t *minus_button;
+    lv_obj_t *pomo_start_end_button;
     lv_obj_t *plus_button;
     lv_obj_t *obj0;
     lv_obj_t *time_text;
-    lv_obj_t *pomo_start_end_button;
+    lv_obj_t *obj1;
     lv_obj_t *clock_text;
     lv_obj_t *clock_text_1;
     lv_obj_t *clock_text_2;
