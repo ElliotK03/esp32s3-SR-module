@@ -1226,6 +1226,14 @@
                     "DEFAULT": {
                       "bg_color": "#FFFFFF"
                     }
+                  },
+                  "KNOB": {
+                    "DEFAULT": {
+                      "pad_top": 3,
+                      "pad_bottom": 3,
+                      "pad_left": 3,
+                      "pad_right": 3
+                    }
                   }
                 }
               },
@@ -1238,7 +1246,7 @@
               "mode": "NORMAL",
               "value": "screen_brightness_val",
               "valueType": "expression",
-              "previewValue": 25,
+              "previewValue": "0",
               "valueLeft": 0,
               "valueLeftType": "literal",
               "previewValueLeft": 0,
@@ -1347,6 +1355,14 @@
                     "DEFAULT": {
                       "bg_color": "#FFFFFF"
                     }
+                  },
+                  "KNOB": {
+                    "DEFAULT": {
+                      "pad_top": 3,
+                      "pad_bottom": 3,
+                      "pad_left": 3,
+                      "pad_right": 3
+                    }
                   }
                 }
               },
@@ -1359,7 +1375,7 @@
               "mode": "NORMAL",
               "value": "volume",
               "valueType": "expression",
-              "previewValue": 25,
+              "previewValue": "70",
               "valueLeft": 0,
               "valueLeftType": "literal",
               "previewValueLeft": 0,
