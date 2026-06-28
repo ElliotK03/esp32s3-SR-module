@@ -18,6 +18,10 @@ static void apply_voice_settings(const voice_settings_t *vs);
 static void apply_pomodoro_settings(const pomodoro_settings_t *ps);
 
 /* ------------------------------------------------------------------ */
+user_settings_t * get_cached_settings(){
+  return &cached_settings;
+}
+
 void settings_manager_init(void) {
   count = 0;
   nvs_helper_init();

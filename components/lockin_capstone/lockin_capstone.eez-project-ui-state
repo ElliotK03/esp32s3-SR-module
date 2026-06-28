@@ -1,8 +1,9 @@
 {
   "navigation": {
     "selectedUserPageObject": "[lockin_capstone.eez-project]:/userPages/3",
-    "selectedActionObject": "[lockin_capstone.eez-project]:/actions/0",
-    "selectedGlobalVariableObject": "[lockin_capstone.eez-project]:/variables/globalVariables/5",
+    "selectedActionObject": "[lockin_capstone.eez-project]:/actions/8",
+    "selectedGlobalVariableObject": "[lockin_capstone.eez-project]:/variables/globalVariables/8",
+    "selectedBitmapObject": "[lockin_capstone.eez-project]:/bitmaps/2",
     "subnavigationSelectedItems": {
       "variables-tab/sub-navigation/selected-item": "Global"
     }
@@ -25,8 +26,7 @@
           },
           {
             "type": "border",
-            "selected": 0,
-            "size": 61.5,
+            "size": 175.5,
             "location": "right",
             "children": [
               {
@@ -121,12 +121,13 @@
             {
               "type": "row",
               "id": "#1c01432c-f0ed-4d59-917f-d9dc6a466cfa",
-              "weight": 18.221647600071286,
+              "weight": 23.241797094886664,
               "children": [
                 {
                   "type": "tabset",
                   "id": "#af60ef06-65c2-4a6e-947b-937200adf32e",
                   "weight": 1,
+                  "selected": 2,
                   "enableClose": false,
                   "children": [
                     {
@@ -192,8 +193,8 @@
             {
               "type": "tabset",
               "id": "EDITORS",
-              "weight": 46.407398570574294,
-              "selected": 2,
+              "weight": 39.94970476488584,
+              "selected": 1,
               "enableDeleteWhenEmpty": false,
               "enableClose": false,
               "children": [
@@ -207,18 +208,6 @@
                     "permanent": false
                   },
                   "icon": "svg:page"
-                },
-                {
-                  "type": "tab",
-                  "id": "#4dd0c1cd-7661-4e01-821d-1704e051a3a7",
-                  "name": "Settings",
-                  "component": "editor",
-                  "config": {
-                    "objectPath": "[lockin_capstone.eez-project]:/settings",
-                    "subObjectPath": "[lockin_capstone.eez-project]:/settings",
-                    "permanent": false
-                  },
-                  "icon": "material:settings"
                 },
                 {
                   "type": "tab",
@@ -248,12 +237,12 @@
             {
               "type": "row",
               "id": "#a59f865c-1a2d-4400-b0f6-4f26c37743a1",
-              "weight": 35.370953829354406,
+              "weight": 36.80849814022747,
               "children": [
                 {
                   "type": "tabset",
                   "id": "#7756ed54-543f-422b-8fbf-b9e60fee0b97",
-                  "weight": 2.384083044982699,
+                  "weight": 2.030826140567201,
                   "children": [
                     {
                       "type": "tab",
@@ -268,7 +257,7 @@
                 {
                   "type": "tabset",
                   "id": "#84d0c87e-f60c-49d6-8b32-574cbcdf9b94",
-                  "weight": 0.615916955017301,
+                  "weight": 0.969173859432799,
                   "children": [
                     {
                       "type": "tab",
@@ -1074,7 +1063,8 @@
                       "component": "groups",
                       "enableClose": false
                     }
-                  ]
+                  ],
+                  "active": true
                 },
                 {
                   "type": "tabset",
@@ -1121,7 +1111,7 @@
           "x": -281.8780865958307,
           "y": -402.1859269452618
         },
-        "scale": 2
+        "scale": 1.5
       },
       "timeline": {
         "isEditorActive": false,
@@ -1144,7 +1134,7 @@
           "x": -157.62131313131312,
           "y": -304.6087878787877
         },
-        "scale": 2
+        "scale": 1.5
       },
       "timeline": {
         "isEditorActive": false,
@@ -1166,7 +1156,7 @@
           "x": -160,
           "y": -360
         },
-        "scale": 2
+        "scale": 1.5
       },
       "timeline": {
         "isEditorActive": false,
@@ -1181,15 +1171,17 @@
         "0": {
           "0": {},
           "5": {},
-          "6": {}
+          "6": {},
+          "7": {},
+          "12": {}
         }
       },
       "transform": {
         "translate": {
-          "x": -160,
-          "y": -240
+          "x": -165.72922077922073,
+          "y": -193.06022727272716
         },
-        "scale": 2
+        "scale": 1.5
       },
       "timeline": {
         "isEditorActive": false,
@@ -1197,7 +1189,8 @@
         "secondToPx": 200,
         "scrollLeft": 0
       }
-    }
+    },
+    "[lockin_capstone.eez-project]:/lvglStyles/styles[tree-state]": {}
   },
   "activeOutputSection": 0,
   "searchPattern": "",
@@ -1211,7 +1204,7 @@
   "showComponentDescriptions": true,
   "logsPanelFilter": "all",
   "selectedStylePropertyName": "",
-  "lvglPart": "MAIN",
+  "lvglPart": "KNOB",
   "lvglState": "DEFAULT",
   "lvglExpandedPropertiesGroup": [
     "TEXT",
@@ -1219,6 +1212,7 @@
   ],
   "showInactiveFlowsInDebugger": true,
   "globalFlowZoom": true,
-  "flowZoom": 2,
-  "implementationLanguage": "C"
+  "flowZoom": 1.5,
+  "implementationLanguage": "C",
+  "openDialogDefaultPath": "/home/fera/Downloads/brightness_7_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.png"
 }

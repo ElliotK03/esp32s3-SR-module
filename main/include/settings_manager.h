@@ -30,3 +30,8 @@ esp_err_t settings_manager_set_wakenet_threshold(float th);
 esp_err_t settings_manager_set_volume(uint8_t vol);
 esp_err_t settings_manager_set_pomodoro_work(uint32_t secs);
 esp_err_t settings_manager_set_brightness(int32_t brightness);
+
+/* 
+ * Return cached settings, do not directly modify the contents
+ */
+user_settings_t * get_cached_settings();

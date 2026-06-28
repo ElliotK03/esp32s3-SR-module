@@ -1947,7 +1947,7 @@
                   "objID": "04abc218-d207-41d1-8691-8f74266c9c29",
                   "eventName": "PRESSED",
                   "handlerType": "action",
-                  "action": "button_reset_device_pressed",
+                  "action": "button_start_pairing_pressed",
                   "userData": 0
                 }
               ],
