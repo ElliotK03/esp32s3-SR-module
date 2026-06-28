@@ -4,6 +4,9 @@
 */
 
 #include <string.h>
+#include <time.h>
+#include <stdlib.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -21,8 +24,7 @@
 #include "esp_sntp.h"
 #include "esp_timer.h"
 #include "esp_system.h"
-#include <time.h>
-#include <stdlib.h>
+#include "esp_mac.h"
 
 #include "app_logic.h"
 #include "connections.h"
@@ -45,6 +47,13 @@ static char s_active_ssid[64] = {0};
 static TaskHandle_t s_firebase_task_handle = NULL;
 
 #define WIFI_RETRY_DELAY_MS 5000
+
+void get_device_id(char *buf, size_t len) {
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    snprintf(buf, len, "%02X%02X%02X%02X%02X%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
 
 static void update_wifi_status(const char *status) {
     set_var_wifi_status_str(status ? status : "Not connected");
@@ -220,6 +229,16 @@ static esp_err_t wifi_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t device_id_handler(httpd_req_t *req) {
+    char device_id[18];
+    get_device_id(device_id, sizeof(device_id));
+    char response[64];
+    snprintf(response, sizeof(response), "{\"device_id\":\"%s\"}", device_id);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, response);
+    return ESP_OK;
+}
+
 static httpd_handle_t start_http_server(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     httpd_handle_t server = NULL;
@@ -239,9 +258,15 @@ static httpd_handle_t start_http_server(void) {
         .method   = HTTP_POST,
         .handler  = wifi_handler,
     };
+    httpd_uri_t device_id_uri = { 
+        .uri = "/device_id",
+        .method = HTTP_GET,
+        .handler = device_id_handler
+    };
 
     httpd_register_uri_handler(server, &status_uri);
     httpd_register_uri_handler(server, &wifi_uri);
+    httpd_register_uri_handler(server, &device_id_uri);
     return server;
 }
 
@@ -492,12 +517,15 @@ static void firestore_push_blink(int blink_count, bool led_on) {
         (int)(esp_timer_get_time() / 1000000) // uptime in seconds
     ); 
 
+    char device_id[18];
+    get_device_id(device_id, sizeof(device_id));
+
     // 5. Build URL
     char url[512];
     snprintf(url, sizeof(url),
         "https://firestore.googleapis.com/v1/projects/%s"
-        "/databases/(default)/documents/diagnostics",
-        FIRESTORE_PROJECT_ID);
+        "/databases/(default)/documents/diagnostics/%s",
+        FIRESTORE_PROJECT_ID, device_id);
 
     // 6. HTTP POST CONFIGURATION
     esp_http_client_config_t config = {
