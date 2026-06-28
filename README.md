@@ -10,6 +10,37 @@
 This example is used to test performance of wakenet.(the word word engine of Espressif).
 This example can load multiple models, but can only run two models at the same time
 
+### Firestore Schema Structure
+```
+Firestore
+│
+├── devices
+│     ├── A4CF12BCD123
+│     │      ├── lock_status
+│     │      ├── speaker_volume
+│     │      └── screen_brightness
+│     │
+│     └── B84D43FF1122
+│            ├── lock_status
+│            ├── speaker_volume
+│            └── screen_brightness
+│
+└── diagnostics
+      ├── A4CF12BCD123
+      │      ├── timestamp
+      │      ├── wifi_rssi
+      │      ├── free_heap_bytes
+      │      ├── uptime_seconds
+      │      └── firmware_version
+      │
+      └── B84D43FF1122
+             ├── timestamp
+             ├── wifi_rssi
+             ├── free_heap_bytes
+             ├── uptime_seconds
+             └── firmware_version
+```
+
 
 ### Configure
 
