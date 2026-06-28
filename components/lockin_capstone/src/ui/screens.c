@@ -139,6 +139,12 @@ void create_screen_main() {
                 }
             }
         }
+        {
+            lv_obj_t *obj = lv_image_create(parent_obj);
+            lv_obj_set_pos(obj, 185, 268);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_image_set_src(obj, &img_pause_bitmap);
+        }
     }
     
     tick_screen_main();
