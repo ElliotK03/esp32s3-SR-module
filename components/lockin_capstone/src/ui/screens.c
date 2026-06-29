@@ -138,7 +138,7 @@ void create_screen_main() {
         {
             lv_obj_t *obj = lv_arc_create(parent_obj);
             objects.obj0 = obj;
-            lv_obj_set_pos(obj, 30, 12);
+            lv_obj_set_pos(obj, 30, 13);
             lv_obj_set_size(obj, 180, 182);
             lv_arc_set_bg_start_angle(obj, 0);
             lv_arc_set_bg_end_angle(obj, 360);
@@ -150,16 +150,24 @@ void create_screen_main() {
             // time_text
             lv_obj_t *obj = lv_label_create(parent_obj);
             objects.time_text = obj;
-            lv_obj_set_pos(obj, 79, 87);
+            lv_obj_set_pos(obj, 70, 79);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_obj_set_style_text_font(obj, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_width(obj, 100, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_height(obj, 50, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text(obj, "");
         }
         {
             lv_obj_t *obj = lv_label_create(parent_obj);
-            lv_obj_set_pos(obj, 105, 120);
+            objects.obj2 = obj;
+            lv_obj_set_pos(obj, 20, 129);
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-            lv_label_set_text_static(obj, "Text");
+            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_width(obj, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_height(obj, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(obj, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_label_set_text(obj, "");
         }
     }
     
@@ -191,6 +199,15 @@ void tick_screen_main() {
         if (strcmp(new_val, cur_val) != 0) {
             tick_value_change_obj = objects.time_text;
             lv_label_set_text(objects.time_text, new_val);
+            tick_value_change_obj = NULL;
+        }
+    }
+    {
+        const char *new_val = get_var_tim_user_text_str();
+        const char *cur_val = lv_label_get_text(objects.obj2);
+        if (strcmp(new_val, cur_val) != 0) {
+            tick_value_change_obj = objects.obj2;
+            lv_label_set_text(objects.obj2, new_val);
             tick_value_change_obj = NULL;
         }
     }

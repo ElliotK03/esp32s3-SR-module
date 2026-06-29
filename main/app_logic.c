@@ -46,6 +46,8 @@ static int32_t timer_arc_value = 0;
 static char display_tim_str[16] = "25:00";
 static char start_end_str[16] = "Start";
 static char wifi_status_str[50] = "Not connected";
+static char session_start_stop_button_str[32] = "Start focus";
+static char tim_user_text_str[32] = "Select focus period";
 
 // Pomodoro period (duration to set), in seconds
 static uint32_t pomo_tim_period_sec = 25 * 60;  // default 25 minutes
@@ -98,11 +100,54 @@ void set_var_wifi_status_str(const char *value) {
     wifi_status_str[sizeof(wifi_status_str) - 1] = '\0';
 }
 
+const char *get_var_session_start_stop_button_str() {
+    return session_start_stop_button_str;
+}
+
+void set_var_session_start_stop_button_str(const char *value) {
+    if (value == NULL) {
+        session_start_stop_button_str[0] = '\0';
+        return;
+    }
+    strncpy(session_start_stop_button_str, value, sizeof(session_start_stop_button_str) - 1);
+    session_start_stop_button_str[sizeof(session_start_stop_button_str) - 1] = '\0';
+}
+
+const char *get_var_tim_user_text_str() {
+    return tim_user_text_str;
+}
+
+void set_var_tim_user_text_str(const char *value) {
+    if (value == NULL) {
+        tim_user_text_str[0] = '\0';
+        return;
+    }
+    strncpy(tim_user_text_str, value, sizeof(tim_user_text_str) - 1);
+    tim_user_text_str[sizeof(tim_user_text_str) - 1] = '\0';
+}
+
 static void update_pomo_period_display() {
     uint32_t mins = pomo_tim_period_sec / 60;
     char buf[16];
     snprintf(buf, sizeof(buf), "%02u:00", (unsigned)mins);
     set_var_display_tim_str(buf);
+}
+
+// ============= User Text Update Helper =============
+static void update_tim_user_text() {
+    if (!pomodoro.running || pomodoro.duration_sec == 0) {
+        set_var_tim_user_text_str("Select focus period");
+        return;
+    }
+    
+    double fraction = (double)pomodoro.remaining_sec / pomodoro.duration_sec;
+    if (fraction > 0.66) {
+        set_var_tim_user_text_str("Deep work");
+    } else if (fraction > 0.33) {
+        set_var_tim_user_text_str("Concentrate");
+    } else {
+        set_var_tim_user_text_str("Keep going");
+    }
 }
 
 // ============= Arc Update Helper =============
@@ -124,6 +169,8 @@ static void update_arc_display() {
     char buf[16];
     snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)mins, (unsigned)secs);
     set_var_display_tim_str(buf);
+    
+    update_tim_user_text();
 }
 
 // ============= FreeRTOS Timer Callback =============
@@ -144,6 +191,8 @@ static void timer_callback(TimerHandle_t xTimer) {
         xTimerStop(pomodoro.timer_handle, 0);
         ESP_LOGI(TAG, "Timer finished!");
         set_var_timer_arc_value(0);
+        set_var_session_start_stop_button_str("Start focus");
+        set_var_tim_user_text_str("Select focus period");
         set_var_start_end_str("Start");
         update_pomo_period_display();
         
@@ -153,7 +202,7 @@ static void timer_callback(TimerHandle_t xTimer) {
             lv_obj_invalidate(objects.pomo_start_end_button);
             lv_obj_t *label = lv_obj_get_child(objects.pomo_start_end_button, 0);
             if (label != NULL) {
-                lv_label_set_text(label, "Start");
+                lv_label_set_text(label, "Start focus");
             }
         }
     }
@@ -190,6 +239,8 @@ void start_timer(uint32_t duration_seconds) {
     if (pomodoro.timer_handle != NULL) {
         xTimerStart(pomodoro.timer_handle, 0);
         update_arc_display();
+        update_tim_user_text();
+        set_var_session_start_stop_button_str("Stop");
         set_var_start_end_str("Stop");
         
         // Set button color to red and text to Stop
@@ -219,6 +270,8 @@ void stop_timer() {
     pomodoro.remaining_sec = 0;
     pomodoro.duration_sec = 0;
     set_var_timer_arc_value(0);
+    set_var_session_start_stop_button_str("Start focus");
+    set_var_tim_user_text_str("Select focus period");
     set_var_start_end_str("Start");
     update_pomo_period_display();
     
@@ -228,7 +281,7 @@ void stop_timer() {
         lv_obj_invalidate(objects.pomo_start_end_button);
         lv_obj_t *label = lv_obj_get_child(objects.pomo_start_end_button, 0);
         if (label != NULL) {
-            lv_label_set_text(label, "Start");
+            lv_label_set_text(label, "Start focus");
         }
     }
     
@@ -249,6 +302,8 @@ uint32_t get_remaining_time() {
 void app_logic_init() {
     // Initialize the period display on startup
     update_pomo_period_display();
+    set_var_session_start_stop_button_str("Start focus");
+    set_var_tim_user_text_str("Select focus period");
 }
 
 // ============= EEZ Studio Action Handlers =============

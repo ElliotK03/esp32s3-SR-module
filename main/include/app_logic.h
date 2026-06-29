@@ -58,6 +58,11 @@ void set_var_volume(int32_t value);
 const char *get_var_wifi_status_str();
 void set_var_wifi_status_str(const char *value);
 
+const char *get_var_session_start_stop_button_str();
+void set_var_session_start_stop_button_str(const char *value);
+const char *get_var_tim_user_text_str();
+void set_var_tim_user_text_str(const char *value);
+
 void app_logic_register_persist_brightness_cb(void (*cb)(int32_t));
 void app_logic_register_volume_released_cb(void (*cb)(int32_t));
 void app_logic_register_brightness_released_cb(void (*cb)(int32_t));

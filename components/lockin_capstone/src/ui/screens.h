@@ -29,6 +29,7 @@ typedef struct _objects_t {
     lv_obj_t *obj0;
     lv_obj_t *time_text;
     lv_obj_t *obj1;
+    lv_obj_t *obj2;
     lv_obj_t *clock_text;
     lv_obj_t *clock_text_1;
     lv_obj_t *clock_text_2;

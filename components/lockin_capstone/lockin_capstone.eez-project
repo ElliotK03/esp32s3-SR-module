@@ -197,6 +197,15 @@
         "defaultValue": "\"\"",
         "persistent": false,
         "native": false
+      },
+      {
+        "objID": "9e2f3610-8c28-45f6-ccad-32a6cea5d319",
+        "name": "tim_user_text_str",
+        "type": "string",
+        "size": null,
+        "defaultValue": "\"\"",
+        "persistent": false,
+        "native": false
       }
     ],
     "structures": [],
@@ -666,7 +675,7 @@
               "objID": "773c5a9e-3629-4c8e-cd28-3cdd0d78f58b",
               "type": "LVGLArcWidget",
               "left": 30,
-              "top": 12,
+              "top": 13,
               "width": 180,
               "height": 182,
               "customInputs": [],
@@ -734,10 +743,10 @@
             {
               "objID": "4e7c15a0-471e-4297-e8a9-93fed9ad9c91",
               "type": "LVGLLabelWidget",
-              "left": 79,
-              "top": 87,
-              "width": 87,
-              "height": 33,
+              "left": 70,
+              "top": 79,
+              "width": 100,
+              "height": 50,
               "customInputs": [],
               "customOutputs": [],
               "style": {
@@ -769,7 +778,10 @@
                 "definition": {
                   "MAIN": {
                     "DEFAULT": {
-                      "text_font": "MONTSERRAT_30"
+                      "text_font": "MONTSERRAT_30",
+                      "text_align": "CENTER",
+                      "width": 100,
+                      "height": 50
                     }
                   }
                 }
@@ -785,10 +797,10 @@
             {
               "objID": "1f3ed0b9-55b4-4939-e47a-54df12b554f8",
               "type": "LVGLLabelWidget",
-              "left": 105,
-              "top": 120,
-              "width": 29,
-              "height": 16,
+              "left": 20,
+              "top": 129,
+              "width": 200,
+              "height": 20,
               "customInputs": [],
               "customOutputs": [],
               "style": {
@@ -815,14 +827,25 @@
               "disabledStateType": "literal",
               "states": "",
               "localStyles": {
-                "objID": "3db67e54-9ef1-48ff-f30f-ab8811ee7787"
+                "objID": "3db67e54-9ef1-48ff-f30f-ab8811ee7787",
+                "definition": {
+                  "MAIN": {
+                    "DEFAULT": {
+                      "text_align": "CENTER",
+                      "width": 200,
+                      "height": 20,
+                      "text_font": "MONTSERRAT_12"
+                    }
+                  }
+                }
               },
               "group": "",
               "groupIndex": 0,
-              "text": "Text",
-              "textType": "literal",
+              "text": "tim_user_text_str",
+              "textType": "expression",
               "longMode": "WRAP",
-              "recolor": false
+              "recolor": false,
+              "previewValue": "Stay focused"
             }
           ],
           "widgetFlags": "CLICKABLE|PRESS_LOCK|CLICK_FOCUSABLE|GESTURE_BUBBLE|SNAPPABLE|SCROLLABLE|SCROLL_ELASTIC|SCROLL_MOMENTUM|SCROLL_CHAIN_HOR|SCROLL_CHAIN_VER",
