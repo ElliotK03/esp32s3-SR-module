@@ -33,6 +33,21 @@ uint32_t get_pomo_period();
 bool is_timer_running();
 
 /**
+ * Check if timer is currently paused
+ */
+bool is_timer_paused();
+
+/**
+ * Pause the timer
+ */
+void pause_timer();
+
+/**
+ * Resume the timer
+ */
+void resume_timer();
+
+/**
  * Get the remaining time in seconds
  */
 uint32_t get_remaining_time();
@@ -63,6 +78,13 @@ void set_var_session_start_stop_button_str(const char *value);
 const char *get_var_tim_user_text_str();
 void set_var_tim_user_text_str(const char *value);
 
+const char *get_var_curr_streak_str();
+void set_var_curr_streak_str(const char *value);
+bool get_var_start_pomo_container_enable();
+void set_var_start_pomo_container_enable(bool value);
+bool get_var_pomo_running_container_enable();
+void set_var_pomo_running_container_enable(bool value);
+
 void app_logic_register_persist_brightness_cb(void (*cb)(int32_t));
 void app_logic_register_volume_released_cb(void (*cb)(int32_t));
 void app_logic_register_brightness_released_cb(void (*cb)(int32_t));
@@ -92,6 +114,7 @@ void action_button_minus_pressed(lv_event_t *e);
  * Start the pomodoro timer with selected period
  */
 void action_button_start_pomo_pressed(lv_event_t *e);
+void action_button_start_resume_pressed(lv_event_t *e);
 void action_button_start_pairing_pressed(lv_event_t *e);
 
 

@@ -118,10 +118,20 @@ void speech_commands_action(int command_id) {
 
   if (command_id == 1 || display_id == 1 || display_id == 14) {
     ESP_LOGI("Speech_commands_action", "Voice command: START TIMER");
-    start_timer(get_pomo_period());
+    if (!is_timer_running()) {
+      start_timer(get_pomo_period());
+    } else if (is_timer_paused()) {
+      resume_timer();
+    } else {
+      ESP_LOGI("Speech_commands_action", "Timer is already running, ignoring start command");
+    }
   } else if (command_id == 3 || display_id == 3 || display_id == 15) {
-    ESP_LOGI("Speech_commands_action", "Voice command: STOP TIMER");
-    stop_timer();
+    ESP_LOGI("Speech_commands_action", "Voice command: PAUSE TIMER");
+    if (is_timer_running() && !is_timer_paused()) {
+      pause_timer();
+    } else {
+      ESP_LOGI("Speech_commands_action", "Timer is not running or already paused, ignoring pause command");
+    }
   } else {
     ESP_LOGI("Speech_commands_action", "No timer action mapped for command ID: %d", display_id);
   }

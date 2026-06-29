@@ -23,7 +23,10 @@ enum FlowGlobalVariables {
     FLOW_GLOBAL_VARIABLE_SCREEN_BRIGHTNESS_VAL = 7,
     FLOW_GLOBAL_VARIABLE_VOLUME = 8,
     FLOW_GLOBAL_VARIABLE_SESSION_START_STOP_BUTTON_STR = 9,
-    FLOW_GLOBAL_VARIABLE_TIM_USER_TEXT_STR = 10
+    FLOW_GLOBAL_VARIABLE_TIM_USER_TEXT_STR = 10,
+    FLOW_GLOBAL_VARIABLE_CURR_STREAK_STR = 11,
+    FLOW_GLOBAL_VARIABLE_START_POMO_CONTAINER_ENABLE = 12,
+    FLOW_GLOBAL_VARIABLE_POMO_RUNNING_CONTAINER_ENABLE = 13
 };
 
 // Native global variables
@@ -50,6 +53,12 @@ extern const char *get_var_session_start_stop_button_str();
 extern void set_var_session_start_stop_button_str(const char *value);
 extern const char *get_var_tim_user_text_str();
 extern void set_var_tim_user_text_str(const char *value);
+extern const char *get_var_curr_streak_str();
+extern void set_var_curr_streak_str(const char *value);
+extern bool get_var_start_pomo_container_enable();
+extern void set_var_start_pomo_container_enable(bool value);
+extern bool get_var_pomo_running_container_enable();
+extern void set_var_pomo_running_container_enable(bool value);
 
 #ifdef __cplusplus
 }
