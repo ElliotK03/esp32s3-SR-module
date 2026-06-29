@@ -1,4 +1,3 @@
 1,start,STnRT
-2,pause,STnP
-3,stop,PeZ
-4,resume,RfZcMd
+2,pause,PeZ
+3,resume,RfZcMd

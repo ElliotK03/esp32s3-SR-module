@@ -2,7 +2,7 @@
   "navigation": {
     "selectedUserPageObject": "[lockin_capstone.eez-project]:/userPages/0",
     "selectedActionObject": "[lockin_capstone.eez-project]:/actions/8",
-    "selectedGlobalVariableObject": "[lockin_capstone.eez-project]:/variables/globalVariables/8",
+    "selectedGlobalVariableObject": "[lockin_capstone.eez-project]:/variables/globalVariables/10",
     "selectedBitmapObject": "[lockin_capstone.eez-project]:/bitmaps/5",
     "subnavigationSelectedItems": {
       "variables-tab/sub-navigation/selected-item": "Global"
@@ -26,7 +26,7 @@
           },
           {
             "type": "border",
-            "selected": 2,
+            "selected": 1,
             "size": 175.5,
             "location": "right",
             "children": [
@@ -159,7 +159,7 @@
                 {
                   "type": "tabset",
                   "id": "#db1e603e-f69b-49e8-9082-5f763cc7d5fe",
-                  "weight": 1,
+                  "weight": 0.7895652173913044,
                   "enableClose": false,
                   "children": [
                     {
@@ -175,7 +175,7 @@
                 {
                   "type": "tabset",
                   "id": "#d7ced149-9109-4e48-89f7-a05b448c8bf6",
-                  "weight": 1,
+                  "weight": 1.2104347826086956,
                   "enableClose": false,
                   "children": [
                     {
@@ -193,10 +193,22 @@
             {
               "type": "tabset",
               "id": "EDITORS",
-              "weight": 39.94970476488584,
+              "weight": 46.13720465582997,
+              "selected": 1,
               "enableDeleteWhenEmpty": false,
               "enableClose": false,
               "children": [
+                {
+                  "type": "tab",
+                  "id": "#6726c7b1-0334-4128-ba08-dec2ce280439",
+                  "name": "Clock",
+                  "component": "editor",
+                  "config": {
+                    "objectPath": "[lockin_capstone.eez-project]:/userPages/1",
+                    "permanent": false
+                  },
+                  "icon": "svg:page"
+                },
                 {
                   "type": "tab",
                   "id": "#c844cfff-f305-47e9-a5fa-b5eaa33c375c",
@@ -214,12 +226,12 @@
             {
               "type": "row",
               "id": "#a59f865c-1a2d-4400-b0f6-4f26c37743a1",
-              "weight": 36.80849814022747,
+              "weight": 30.620998249283335,
               "children": [
                 {
                   "type": "tabset",
                   "id": "#7756ed54-543f-422b-8fbf-b9e60fee0b97",
-                  "weight": 2.030826140567201,
+                  "weight": 1.4740484429065743,
                   "children": [
                     {
                       "type": "tab",
@@ -234,7 +246,7 @@
                 {
                   "type": "tabset",
                   "id": "#84d0c87e-f60c-49d6-8b32-574cbcdf9b94",
-                  "weight": 0.969173859432799,
+                  "weight": 1.5259515570934257,
                   "children": [
                     {
                       "type": "tab",
@@ -1075,21 +1087,20 @@
       "selectionFront": {},
       "selectionBack": {
         "0": {
-          "0": {},
-          "1": {},
-          "3": {},
-          "4": {},
-          "5": {
-            "$selected": true
-          }
+          "0": {
+            "0": {},
+            "1": {},
+            "2": {}
+          },
+          "2": {}
         }
       },
       "transform": {
         "translate": {
-          "x": -281.8780865958307,
-          "y": -282.1859269452618
+          "x": -298.491751469242,
+          "y": -355.6247508694755
         },
-        "scale": 1.5
+        "scale": 2.5
       },
       "timeline": {
         "isEditorActive": false,
@@ -1102,9 +1113,10 @@
       "selectionFront": {},
       "selectionBack": {
         "0": {
-          "1": {
+          "0": {
             "$selected": true
-          }
+          },
+          "1": {}
         }
       },
       "transform": {
@@ -1112,7 +1124,7 @@
           "x": -157.62131313131312,
           "y": -304.6087878787877
         },
-        "scale": 1.5
+        "scale": 2.5
       },
       "timeline": {
         "isEditorActive": false,
@@ -1134,7 +1146,7 @@
           "x": -160,
           "y": -360
         },
-        "scale": 1.5
+        "scale": 2.5
       },
       "timeline": {
         "isEditorActive": false,
@@ -1185,12 +1197,14 @@
   "lvglPart": "KNOB",
   "lvglState": "DEFAULT",
   "lvglExpandedPropertiesGroup": [
-    "POSITION AND SIZE",
-    "PADDING"
+    "PADDING",
+    "TEXT",
+    "LAYOUT",
+    "POSITION AND SIZE"
   ],
   "showInactiveFlowsInDebugger": true,
   "globalFlowZoom": true,
-  "flowZoom": 1.5,
+  "flowZoom": 2.5,
   "implementationLanguage": "C",
   "openDialogDefaultPath": "/home/fera/Downloads/pause_35dp_E3E3E3_FILL0_wght400_GRAD0_opsz40.png"
 }
