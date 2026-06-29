@@ -51,16 +51,7 @@ static esp_mn_iface_t *multinet;
 static model_iface_data_t *model_data;
 
 // include and wrapper for chime
-#include "chime.h"
-static void chime_wake_task(void *arg) {
-  chime_play_wake();
-  vTaskDelete(NULL);
-}
-
-static void chime_ack_task(void *arg) {
-  chime_play_ack();
-  vTaskDelete(NULL);
-}
+#include "app_logic.h"
 
 // Speech recognition tasks
 void feed_Task(void *arg) {
@@ -132,7 +123,7 @@ void detect_Task(void *arg) {
       if (res->wakeup_state == WAKENET_DETECTED) {
         ESP_LOGI("detect_Task", "WAKEWORD DETECTED");
         multinet->clean(model_data);
-        xTaskCreatePinnedToCore(chime_wake_task, "chimeWake", 4096, NULL, 10, NULL, 1);
+        app_play_chime(POMO_EV_PLAY_CHIME_WAKE);
       }
 
       if (res->raw_data_channels == 1 &&
@@ -163,7 +154,7 @@ void detect_Task(void *arg) {
                 i + 1, mn_result->command_id[i], mn_result->phrase_id[i],
                 mn_result->string, mn_result->prob[i]);
           }
-          xTaskCreatePinnedToCore(&chime_ack_task, "chimeAck", 1560, NULL, 10, NULL, 1);
+          app_play_chime(POMO_EV_PLAY_CHIME_ACK);
           speech_commands_action(mn_result->command_id[0]);
           detect_flag = 1;
 

@@ -26,7 +26,9 @@ enum FlowGlobalVariables {
     FLOW_GLOBAL_VARIABLE_TIM_USER_TEXT_STR = 10,
     FLOW_GLOBAL_VARIABLE_CURR_STREAK_STR = 11,
     FLOW_GLOBAL_VARIABLE_START_POMO_CONTAINER_ENABLE = 12,
-    FLOW_GLOBAL_VARIABLE_POMO_RUNNING_CONTAINER_ENABLE = 13
+    FLOW_GLOBAL_VARIABLE_POMO_RUNNING_CONTAINER_ENABLE = 13,
+    FLOW_GLOBAL_VARIABLE_PLUS_5_BUTTON_DISABLED = 14,
+    FLOW_GLOBAL_VARIABLE_POMO_RESTING_CONTAINER_ENABLE = 15
 };
 
 // Native global variables
@@ -59,6 +61,10 @@ extern bool get_var_start_pomo_container_enable();
 extern void set_var_start_pomo_container_enable(bool value);
 extern bool get_var_pomo_running_container_enable();
 extern void set_var_pomo_running_container_enable(bool value);
+extern bool get_var_plus_5_button_disabled();
+extern void set_var_plus_5_button_disabled(bool value);
+extern bool get_var_pomo_resting_container_enable();
+extern void set_var_pomo_resting_container_enable(bool value);
 
 #ifdef __cplusplus
 }

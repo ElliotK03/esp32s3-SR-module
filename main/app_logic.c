@@ -2,11 +2,13 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include "freertos/FreeRTOS.h"
+#include "app_logic.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
 #include "esp_log.h"
 #include "ui.h"
 #include "images.h"
+#include "chime.h"
 #include "settings_manager.h"
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +16,7 @@
 
 static void (*g_persist_brightness_cb)(int32_t) = NULL;
 static void (*g_lock_cb)(void) = NULL;
-static void (*g_unlock_cb)(void) = NULL;
+static void (*g_unlock_cb)(void) = NULL;    
 static void (*g_reset_cb)(void) = NULL;
 static void (*g_start_pairing_cb)(void) = NULL;
 static void (*g_volume_release)(int32_t) = NULL;
@@ -24,12 +26,20 @@ void app_logic_set_work_duration(uint32_t secs);
 static const char *TAG = "APP_LOGIC";
 
 // ============= Timer State =============
+typedef enum {
+    POMO_STATE_IDLE,
+    POMO_STATE_WORKING,
+    POMO_STATE_RESTING
+} pomo_mode_t;
+
 typedef struct {
     uint32_t duration_sec;       // Total duration in seconds
     uint32_t remaining_sec;      // Seconds remaining
     bool running;                // Is timer currently running?
     bool paused;                 // Is timer currently paused?
     TimerHandle_t timer_handle;  // FreeRTOS timer handle
+    pomo_mode_t mode;            // Current mode (idle, working, resting)
+    bool has_added_5_min;        // Track if user already added 5 min in this resting session
 } pomodoro_state_t;
 
 static pomodoro_state_t pomodoro = {
@@ -37,12 +47,19 @@ static pomodoro_state_t pomodoro = {
     .remaining_sec = 0,
     .running = false,
     .paused = false,
-    .timer_handle = NULL
+    .timer_handle = NULL,
+    .mode = POMO_STATE_IDLE,
+    .has_added_5_min = false
 };
 
 // Forward declarations
 static void timer_callback(TimerHandle_t xTimer);
 void stop_timer();
+static void start_resting_timer(uint32_t duration_seconds);
+static void pomo_worker_task(void *arg);
+
+// Queue and task variables
+static QueueHandle_t pomo_worker_queue = NULL;
 
 // ============= Variable Storage =============
 static int32_t timer_arc_value = 0;
@@ -57,6 +74,8 @@ static uint32_t pomo_tim_period_sec = 25 * 60;  // default 25 minutes
 
 static bool start_pomo_container_enable_val = false;
 static bool pomo_running_container_enable_val = true;
+static bool plus_5_button_disabled_val = false;
+static bool pomo_resting_container_enable_val = true;
 static char curr_streak_str[32] = "Streak: 0";
 static uint32_t streak_count = 0;
 
@@ -163,6 +182,28 @@ void set_var_pomo_running_container_enable(bool value) {
     pomo_running_container_enable_val = value;
 }
 
+bool get_var_plus_5_button_disabled() {
+    return plus_5_button_disabled_val;
+}
+
+void set_var_plus_5_button_disabled(bool value) {
+    plus_5_button_disabled_val = value;
+}
+
+bool get_var_pomo_resting_container_enable() {
+    return pomo_resting_container_enable_val;
+}
+
+void set_var_pomo_resting_container_enable(bool value) {
+    pomo_resting_container_enable_val = value;
+}
+
+void app_play_chime(pomo_worker_event_t chime_ev) {
+    if (pomo_worker_queue != NULL) {
+        xQueueSend(pomo_worker_queue, &chime_ev, 0);
+    }
+}
+
 static void update_pomo_period_display() {
     uint32_t mins = pomo_tim_period_sec / 60;
     uint32_t secs = pomo_tim_period_sec % 60;
@@ -175,6 +216,18 @@ static void update_pomo_period_display() {
 static void update_tim_user_text() {
     if (!pomodoro.running || pomodoro.duration_sec == 0) {
         set_var_tim_user_text_str("Select focus period");
+        return;
+    }
+    
+    if (pomodoro.mode == POMO_STATE_RESTING) {
+        double fraction = (double)pomodoro.remaining_sec / pomodoro.duration_sec;
+        if (fraction > 0.66) {
+            set_var_tim_user_text_str("Take a break");
+        } else if (fraction > 0.33) {
+            set_var_tim_user_text_str("Relax your mind");
+        } else {
+            set_var_tim_user_text_str("Nearly done resting");
+        }
         return;
     }
     
@@ -211,53 +264,179 @@ static void update_arc_display() {
     update_tim_user_text();
 }
 
+// ============= Unified pomo Worker Task & Helpers =============
+static void pomo_worker_task(void *arg) {
+    pomo_worker_event_t ev;
+    
+    while (1) {
+        if (xQueueReceive(pomo_worker_queue, &ev, portMAX_DELAY) == pdTRUE) {
+            switch (ev) {
+                case POMO_EV_PLAY_CHIME_WAKE:
+                    chime_play_wake();
+                    break;
+                case POMO_EV_PLAY_CHIME_ACK:
+                    chime_play_ack();
+                    break;
+                case POMO_EV_TICK:
+                    if (pomodoro.running && !pomodoro.paused) {
+                        if (pomodoro.remaining_sec > 0) {
+                            pomodoro.remaining_sec--;
+                            update_arc_display();
+                            if (pomodoro.remaining_sec % 60 == 0) {
+                                ESP_LOGI(TAG, "Timer remaining: %"PRIu32"s", pomodoro.remaining_sec);
+                            }
+                        } else {
+                            if (pomodoro.mode == POMO_STATE_WORKING) {
+                                ESP_LOGI(TAG, "Work session finished!");
+                                
+                                // Stop timer during 3 seconds flashing delay
+                                xTimerStop(pomodoro.timer_handle, 0);
+                                pomodoro.running = false;
+                                
+                                chime_play_work_done();
+                                
+                                // Stay at work timer 00:00 and flash text for 3 seconds (10 toggles * 300ms)
+                                for (int i = 0; i < 10; i++) {
+                                    if (objects.time_text != NULL) {
+                                        if (lv_obj_has_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN)) {
+                                            lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+                                        } else {
+                                            lv_obj_add_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+                                        }
+                                    }
+                                    vTaskDelay(pdMS_TO_TICKS(300));
+                                }
+                                if (objects.time_text != NULL) {
+                                    lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+                                }
+                                
+                                streak_count++;
+                                snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: %"PRIu32, streak_count);
+                                
+                                // Auto start resting timer (default 5 minutes = 300 seconds)
+                                // Support 5 seconds for testing when pomo_tim_period_sec == 5
+                                uint32_t rest_duration = (pomo_tim_period_sec == 5) ? 5 : (5 * 60);
+                                start_resting_timer(rest_duration);
+                                
+                            } else if (pomodoro.mode == POMO_STATE_RESTING) {
+                                ESP_LOGI(TAG, "Resting session finished!");
+                                
+                                // Stop timer during 3 seconds flashing delay
+                                xTimerStop(pomodoro.timer_handle, 0);
+                                pomodoro.running = false;
+                                
+                                chime_play_rest_done();
+                                
+                                // Stay at 00:00 and flash text for 3 seconds (10 toggles * 300ms)
+                                for (int i = 0; i < 10; i++) {
+                                    if (objects.time_text != NULL) {
+                                        if (lv_obj_has_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN)) {
+                                            lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+                                        } else {
+                                            lv_obj_add_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+                                        }
+                                    }
+                                    vTaskDelay(pdMS_TO_TICKS(300));
+                                }
+                                if (objects.time_text != NULL) {
+                                    lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+                                }
+                                
+                                pomodoro.paused = false;
+                                pomodoro.mode = POMO_STATE_IDLE;
+                                pomodoro.has_added_5_min = false;
+                                
+                                // Restore arc indicator color to default
+                                if (objects.obj0 != NULL) {
+                                    lv_obj_remove_local_style_prop(objects.obj0, LV_STYLE_ARC_COLOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+                                    lv_obj_invalidate(objects.obj0);
+                                }
+
+                                set_var_timer_arc_value(0);
+                                set_var_session_start_stop_button_str("Start focus");
+                                set_var_tim_user_text_str("Select focus period");
+                                set_var_start_end_str("Start");
+                                update_pomo_period_display();
+
+                                // Reset containers visibility: show start, hide running/resting
+                                start_pomo_container_enable_val = false; // False = shown
+                                pomo_running_container_enable_val = true; // True = hidden
+                                pomo_resting_container_enable_val = true; // True = hidden
+
+                                if (objects.icon_start_resume != NULL) {
+                                    lv_image_set_src(objects.icon_start_resume, &img_play_arrow_bitmap);
+                                }
+                                
+                                if (objects.pomo_start_end_button != NULL) {
+                                    lv_obj_remove_local_style_prop(objects.pomo_start_end_button, LV_STYLE_BG_COLOR, LV_PART_MAIN | LV_STATE_DEFAULT);
+                                    lv_obj_invalidate(objects.pomo_start_end_button);
+                                    lv_obj_t *label = lv_obj_get_child(objects.pomo_start_end_button, 0);
+                                    if (label != NULL) {
+                                        lv_label_set_text(label, "Start focus");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+}
+
+// ============= Start Resting Timer =============
+static void start_resting_timer(uint32_t duration_seconds) {
+    pomodoro.duration_sec = duration_seconds;
+    pomodoro.remaining_sec = duration_seconds;
+    pomodoro.running = true;
+    pomodoro.paused = false;
+    pomodoro.mode = POMO_STATE_RESTING;
+    pomodoro.has_added_5_min = false;
+    
+    // Enable the +5 minute button
+    plus_5_button_disabled_val = false;
+
+    // Change arc indicator color to #7b68ee
+    if (objects.obj0 != NULL) {
+        lv_obj_set_style_arc_color(objects.obj0, lv_color_hex(0x7b68ee), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_invalidate(objects.obj0);
+    }
+
+    // Toggle container visibilities: hide start, hide running, show resting
+    start_pomo_container_enable_val = true;   // True = hidden
+    pomo_running_container_enable_val = true; // True = hidden
+    pomo_resting_container_enable_val = false; // False = shown
+
+    // Make sure FreeRTOS timer is running
+    if (pomodoro.timer_handle == NULL) {
+        pomodoro.timer_handle = xTimerCreate(
+            "pomodoro_timer",
+            pdMS_TO_TICKS(1000),  // 1 second callback interval
+            pdTRUE,               // auto-reload
+            NULL,                 // timer ID
+            timer_callback        // callback function
+        );
+    }
+    
+    if (pomodoro.timer_handle != NULL) {
+        xTimerStart(pomodoro.timer_handle, 0);
+        update_arc_display();
+        update_tim_user_text();
+        ESP_LOGI(TAG, "Resting timer started: %"PRIu32" seconds", duration_seconds);
+    } else {
+        ESP_LOGE(TAG, "Failed to create FreeRTOS timer for resting");
+        pomodoro.running = false;
+    }
+}
+
 // ============= FreeRTOS Timer Callback =============
 static void timer_callback(TimerHandle_t xTimer) {
     (void)xTimer;
-    
-    if (!pomodoro.running) return;
-    if (pomodoro.paused) return;
-    
-    if (pomodoro.remaining_sec > 0) {
-        pomodoro.remaining_sec--;
-        update_arc_display();
-        if (pomodoro.remaining_sec % 60 == 0) {
-            ESP_LOGI(TAG, "Timer: seconds remaining: %"PRIu32"", pomodoro.remaining_sec);
-        }
-    } else {
-        // Timer finished
-        pomodoro.running = false;
-        pomodoro.paused = false;
-        xTimerStop(pomodoro.timer_handle, 0);
-        ESP_LOGI(TAG, "Timer finished!");
-        set_var_timer_arc_value(0);
-        set_var_session_start_stop_button_str("Start focus");
-        set_var_tim_user_text_str("Select focus period");
-        set_var_start_end_str("Start");
-        update_pomo_period_display();
-        
-        // Increment streak count on completion
-        streak_count++;
-        snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: %"PRIu32, streak_count);
-        
-        // Show start container, hide running container
-        start_pomo_container_enable_val = false; // False = shown
-        pomo_running_container_enable_val = true; // True = hidden
-        
-        // Reset icon_start_resume to play arrow
-        if (objects.icon_start_resume != NULL) {
-            lv_image_set_src(objects.icon_start_resume, &img_play_arrow_bitmap);
-        }
-        
-        // Restore button color and text
-        if (objects.pomo_start_end_button != NULL) {
-            lv_obj_remove_local_style_prop(objects.pomo_start_end_button, LV_STYLE_BG_COLOR, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_invalidate(objects.pomo_start_end_button);
-            lv_obj_t *label = lv_obj_get_child(objects.pomo_start_end_button, 0);
-            if (label != NULL) {
-                lv_label_set_text(label, "Start focus");
-            }
-        }
+    if (pomo_worker_queue != NULL) {
+        pomo_worker_event_t ev = POMO_EV_TICK;
+        xQueueSend(pomo_worker_queue, &ev, 0);
     }
 }
 
@@ -277,10 +456,19 @@ void start_timer(uint32_t duration_seconds) {
     pomodoro.remaining_sec = duration_seconds;
     pomodoro.running = true;
     pomodoro.paused = false;
+    pomodoro.mode = POMO_STATE_WORKING;
+    pomodoro.has_added_5_min = false;
 
-    // Toggle container visibilities: hide start, show running
-    start_pomo_container_enable_val = true; // True = hidden
-    pomo_running_container_enable_val = false; // False = shown
+    // Restore arc indicator color to default
+    if (objects.obj0 != NULL) {
+        lv_obj_remove_local_style_prop(objects.obj0, LV_STYLE_ARC_COLOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_invalidate(objects.obj0);
+    }
+
+    // Toggle container visibilities: hide start, show running, hide resting
+    start_pomo_container_enable_val = true;     // True = hidden
+    pomo_running_container_enable_val = false;   // False = shown
+    pomo_resting_container_enable_val = true;   // True = hidden
 
     // Set icon_start_resume to pause bitmap since it's running
     if (objects.icon_start_resume != NULL) {
@@ -333,15 +521,25 @@ void stop_timer() {
     pomodoro.paused = false;
     pomodoro.remaining_sec = 0;
     pomodoro.duration_sec = 0;
+    pomodoro.mode = POMO_STATE_IDLE;
+    pomodoro.has_added_5_min = false;
+
+    // Restore arc indicator color to default
+    if (objects.obj0 != NULL) {
+        lv_obj_remove_local_style_prop(objects.obj0, LV_STYLE_ARC_COLOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_invalidate(objects.obj0);
+    }
+
     set_var_timer_arc_value(0);
     set_var_session_start_stop_button_str("Start focus");
     set_var_tim_user_text_str("Select focus period");
     set_var_start_end_str("Start");
     update_pomo_period_display();
 
-    // Toggle container visibilities: show start, hide running
-    start_pomo_container_enable_val = false; // False = shown
-    pomo_running_container_enable_val = true; // True = hidden
+    // Toggle container visibilities: show start, hide running, hide resting
+    start_pomo_container_enable_val = false;   // False = shown
+    pomo_running_container_enable_val = true;  // True = hidden
+    pomo_resting_container_enable_val = true;  // True = hidden
 
     // Set icon_start_resume back to play arrow
     if (objects.icon_start_resume != NULL) {
@@ -409,9 +607,20 @@ uint32_t get_remaining_time() {
 }
 
 void app_logic_init() {
-    // Initialize container visibilities: show start container, hide running container
+    // Initialize worker task queue and task
+    if (pomo_worker_queue == NULL) {
+        pomo_worker_queue = xQueueCreate(10, sizeof(pomo_worker_event_t));
+        xTaskCreatePinnedToCore(pomo_worker_task, "pomo_worker_task", 4096, NULL, 5, NULL, 1);
+    }
+    
+    // Initialize container visibilities: show start container, hide running container, hide resting container
     start_pomo_container_enable_val = false; // False = shown
     pomo_running_container_enable_val = true; // True = hidden
+    pomo_resting_container_enable_val = true; // True = hidden
+    plus_5_button_disabled_val = false;
+    
+    pomodoro.mode = POMO_STATE_IDLE;
+    pomodoro.has_added_5_min = false;
     
     // Clear the streak
     streak_count = 0;
@@ -500,6 +709,37 @@ void action_button_start_resume_pressed(lv_event_t * e) {
         resume_timer();
     } else {
         pause_timer();
+    }
+}
+
+/**
+ * Plus 5 minutes button pressed (resting mode only, allowed once)
+ */
+void action_plus_5_button_pressed(lv_event_t * e) {
+    (void)e;
+    ESP_LOGI(TAG, "Plus 5 button pressed");
+    if (pomodoro.running && pomodoro.mode == POMO_STATE_RESTING && !pomodoro.has_added_5_min) {
+        pomodoro.remaining_sec += 5 * 60;
+        pomodoro.duration_sec += 5 * 60;
+        pomodoro.has_added_5_min = true;
+        plus_5_button_disabled_val = true;
+        update_arc_display();
+        ESP_LOGI(TAG, "Added 5 minutes to resting timer. New remaining: %"PRIu32"s", pomodoro.remaining_sec);
+    }
+}
+
+/**
+ * Fast forward resting period button pressed
+ */
+void action_button_fast_forward_pressed(lv_event_t * e) {
+    (void)e;
+    ESP_LOGI(TAG, "Fast forward resting period button pressed");
+    if (pomodoro.running && pomodoro.mode == POMO_STATE_RESTING) {
+        pomodoro.remaining_sec = 0;
+        if (pomo_worker_queue != NULL) {
+            pomo_worker_event_t ev = POMO_EV_TICK;
+            xQueueSend(pomo_worker_queue, &ev, 0);
+        }
     }
 }
 

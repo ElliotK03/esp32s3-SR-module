@@ -9,6 +9,16 @@
 extern "C" {
 #endif
 
+typedef enum {
+    POMO_EV_TICK,
+    POMO_EV_WORK_DONE,
+    POMO_EV_REST_DONE,
+    POMO_EV_PLAY_CHIME_WAKE,
+    POMO_EV_PLAY_CHIME_ACK,
+} pomo_worker_event_t;
+
+void app_play_chime(pomo_worker_event_t chime_ev);
+
 extern void app_logic_set_work_duration(uint32_t secs);
 // ============= Public API =============
 
@@ -84,6 +94,10 @@ bool get_var_start_pomo_container_enable();
 void set_var_start_pomo_container_enable(bool value);
 bool get_var_pomo_running_container_enable();
 void set_var_pomo_running_container_enable(bool value);
+bool get_var_plus_5_button_disabled();
+void set_var_plus_5_button_disabled(bool value);
+bool get_var_pomo_resting_container_enable();
+void set_var_pomo_resting_container_enable(bool value);
 
 void app_logic_register_persist_brightness_cb(void (*cb)(int32_t));
 void app_logic_register_volume_released_cb(void (*cb)(int32_t));
@@ -116,6 +130,8 @@ void action_button_minus_pressed(lv_event_t *e);
 void action_button_start_pomo_pressed(lv_event_t *e);
 void action_button_start_resume_pressed(lv_event_t *e);
 void action_button_start_pairing_pressed(lv_event_t *e);
+void action_plus_5_button_pressed(lv_event_t *e);
+void action_button_fast_forward_pressed(lv_event_t *e);
 
 
 /**

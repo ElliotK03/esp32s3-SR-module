@@ -18,6 +18,8 @@ extern void action_slider_brightness_released(lv_event_t * e);
 extern void action_button_start_pairing_pressed(lv_event_t * e);
 extern void action_button_end_session_pressed(lv_event_t * e);
 extern void action_button_start_resume_pressed(lv_event_t * e);
+extern void action_plus_5_button_pressed(lv_event_t * e);
+extern void action_button_fast_forward_pressed(lv_event_t * e);
 
 #ifdef __cplusplus
 }

@@ -8,3 +8,5 @@
 // Safe to call from detect_Task — blocks until audio is done (portMAX_DELAY).
 void chime_play_wake(void);
 void chime_play_ack(void);
+void chime_play_work_done(void);
+void chime_play_rest_done(void);

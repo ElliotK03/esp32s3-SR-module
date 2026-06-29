@@ -23,6 +23,11 @@ typedef struct _objects_t {
     lv_obj_t *clock;
     lv_obj_t *alarm;
     lv_obj_t *settings;
+    lv_obj_t *container_pomo_resting;
+    lv_obj_t *button_fast_forward_resting_time;
+    lv_obj_t *icon_fast_forward;
+    lv_obj_t *pomo_end_session_pressed_1;
+    lv_obj_t *button_plus_5;
     lv_obj_t *container_pomo_running;
     lv_obj_t *button_start_resume_pressed;
     lv_obj_t *icon_start_resume;
@@ -37,6 +42,7 @@ typedef struct _objects_t {
     lv_obj_t *obj2;
     lv_obj_t *obj3;
     lv_obj_t *obj4;
+    lv_obj_t *obj5;
     lv_obj_t *clock_text;
     lv_obj_t *clock_text_1;
     lv_obj_t *clock_text_2;
