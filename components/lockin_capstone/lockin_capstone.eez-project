@@ -2963,7 +2963,7 @@
       "objID": "7b493852-7eb3-4eb6-94a3-7b528a14a57a",
       "name": "wifi_bitmap",
       "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAB/0lEQVRIS92Uv4sTQRTH3xtDEJFEUigh+zLJpbVMp3+B+KNTBDsLO42N58VCEO9EC39gIxYWNiJYCJK/QPAfkJS5OD9YXISgWByst/OOPbLHZpNcNnhX6Kd88+b7nffmzSAcMnjI+v+7gVLqghBiAwBOz2nlV0Rc8zyvN6/VU3cwGAzKxWJxEwAqS97PKAzDlVar9Su9b8LAGKMBgJYUzqKJSCbBXQPf989GUfQ5m4mIv51znXq9/maWqTHmOgA8B4Dj2fUois40Go0vaK3tMPOzTEKPiM4vU4kxJr6Hc5k9t1BrvY6I3fGCC4LgaLvd/rOMeEK/3y+WSqUtABBxjJk3dltkjHkCAFfSvUtQSl0WQrwGgHLalJk3mXlVSvkhexhjjAGAd0R0Z+5LVkqtjUc0D6tEFB9yipkGxphtADiSRznFFhEdmxqUbEApdUMI8WpvzBC3EfFarVZ7n87VWl8VQrxl5kIq/oCI7qfzZlZgre0y87pz7qKU8tN+lWitLyHiRwB4TER3F1aQMBwOTzSbzZ/7iSeMRqNypVKZeMF7HcgjEGOtvc3MT8f5N4noZZ69uQyCIDgVhuH3tGChUDhZrVZ/LDLJZWCtvcfMD9NizrmulPLRgRj4vi+jKPo2MR2I5HmePRCDGKVURwiR/FkdInqxSDwmV4v+hn/fYAcBfbFb21A+KAAAABBkZUJHRjc0RkVCQzEwOTYyRjg1NymwQTkAAAAASUVORK5CYII=",
-      "bpp": 15,
+      "bpp": 32,
       "alwaysBuild": false,
       "lvglBinaryOutputFormat": 3,
       "lvglDither": false
@@ -2972,7 +2972,7 @@
       "objID": "b824f773-17d0-4a12-d245-87aabf287cfb",
       "name": "volume_bitmap",
       "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABqElEQVRIS9WUPUvDQBjHnycIvkwdHKS555rSb+DgJij4DYSCLk6dBGc34+QHEBwKHRUHP4KIunRw8CvYu2BxEHSzoclJSk6u1zQmYkH/W448/9/zdocwY+GM/f8wQAhxCwC7nPPnvC6UapGU8oiIjhNDKaVKjQedTmfJ9/04C1QYkJgDgE9EoxghxA4iXmjTKIqqnuf1bUghgDZPgjVAS0p5nrQq+e52u3PNZjMyId8CTPMsQNquKwDYVkqFnPP5wgDb3AQIId445xWjktFMHMfhrutKfT5WgTG4MSHillLq2gSk/74S0XJy3uv1Wo7jtBHxkTG2WgawQUR3Gq5noL+Hw+FivV7/MDfLnFNmBfYgs4I1QCm1zzk/mxkgjuODWq12Wgpg6fdbNHFZpg+5T0TVNPsWALQB4IGI1jKHbCtvTaWUT0Tk2WuKiMQYCwoB0sxGT4QOmLIA9wCwDgADIloofNGM7L4gGU/FDQBsmnekNMCsxLgHhwBwos3CMKw0Go33ifnZB3nKeq4R8YUxtjItrhTAVBAEl67r7iHiIC+pHwOK6v8DPgFk+vEZQ8xMUQAAABBkZUJHNjcxMjI1Mzg5OUY5MTI0Mb2jOOsAAAAASUVORK5CYII=",
-      "bpp": 15,
+      "bpp": 32,
       "alwaysBuild": false,
       "lvglBinaryOutputFormat": 3,
       "lvglDither": false
@@ -2981,7 +2981,7 @@
       "objID": "8f7e1a2d-db19-4ca8-9183-02b1b9a71661",
       "name": "brightness_bitmap",
       "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABY0lEQVRIS72Vz0rDQBDGJyURFf+g929pwIN4sIc+jSi+XKFPIyp40IspzUCOVltRWlhGErqwptlkWxu/88z8dma+3Q2oZQXr1E/TdJLHK6VOfPO8Acz8QURHy8JTAMc+EC8AM8+I6KBU8BPAYRNkBcDM4koCUMT7xBh5A0xxIxekHOcElAObZIAbAcbj8UWn03kgop0cJCILrXUvjuOXckdrA5h5SERXVR2IyFApdW3vpRbAzF9EtJcn5IFJkvSiKHpsGM8lgCdrJ98A9leWzMxTIipsZ06RpukiCIKoDiAic6XUbsldMwDFnTG2eyOi4nbaLdbZ0ZYjZwLg9H8Ay/ZWRsTMc+OcGs0B1I/IstqvJY9Go/MwDJ8bdnCmlHptXLLLz8w8IKIbB2QA4Nbbpq7ALMv6Wus7G6K17ne73fs/XzRfrf1UlLX1x65KW3muq7TVD8elVr9MyynvIiKtfPqb6gciUOwZlWRvNAAAABBkZUJHNzlBNjgwNTZEREU2QUZDNWsoHMcAAAAASUVORK5CYII=",
-      "bpp": 15,
+      "bpp": 32,
       "alwaysBuild": false,
       "lvglBinaryOutputFormat": 3,
       "lvglDither": false
@@ -2999,7 +2999,7 @@
       "objID": "b4d43aeb-dc17-42ca-8ba7-91b36a4c091f",
       "name": "stop_bitmap",
       "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAAjCAYAAAAe2bNZAAAAdElEQVRYR+2XSwrAIAxE60Fy/4PlIJYu3AjBKUJI7Xtrlclk/LWrEK2QFsSE0KYInDnHGXfvu+eRmS0jsRzwUFKMUt3MKESZ+8oZZUHEqNCmCJzBGXUXDcjMvzOzg3KvSYEs9YTIQnImC8Sc8zvIgsx8IjM3gT14JIaKBHQAAAAQZGVCRzE1RUY1NzUwQTU1NEQ5RjV8g+L/AAAAAElFTkSuQmCC",
-      "bpp": 15,
+      "bpp": 32,
       "alwaysBuild": false,
       "lvglBinaryOutputFormat": 3,
       "lvglDither": false

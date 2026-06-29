@@ -314,8 +314,7 @@ static void pomo_worker_task(void *arg) {
                                 snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: %"PRIu32, streak_count);
                                 
                                 // Auto start resting timer (default 5 minutes = 300 seconds)
-                                // Support 5 seconds for testing when pomo_tim_period_sec == 5
-                                uint32_t rest_duration = (pomo_tim_period_sec == 5) ? 5 : (5 * 60);
+                                uint32_t rest_duration = 5 * 60;
                                 start_resting_timer(rest_duration);
                                 
                             } else if (pomodoro.mode == POMO_STATE_RESTING) {
