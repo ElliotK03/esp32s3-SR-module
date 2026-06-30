@@ -98,6 +98,8 @@ bool get_var_plus_5_button_disabled();
 void set_var_plus_5_button_disabled(bool value);
 bool get_var_pomo_resting_container_enable();
 void set_var_pomo_resting_container_enable(bool value);
+bool get_var_start_pomo_again_container_enable();
+void set_var_start_pomo_again_container_enable(bool value);
 
 void app_logic_register_persist_brightness_cb(void (*cb)(int32_t));
 void app_logic_register_volume_released_cb(void (*cb)(int32_t));
@@ -132,6 +134,7 @@ void action_button_start_resume_pressed(lv_event_t *e);
 void action_button_start_pairing_pressed(lv_event_t *e);
 void action_plus_5_button_pressed(lv_event_t *e);
 void action_button_fast_forward_pressed(lv_event_t *e);
+void action_button_end_session_pressed(lv_event_t *e);
 
 
 /**

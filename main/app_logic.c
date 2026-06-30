@@ -76,6 +76,7 @@ static bool start_pomo_container_enable_val = false;
 static bool pomo_running_container_enable_val = true;
 static bool plus_5_button_disabled_val = false;
 static bool pomo_resting_container_enable_val = true;
+static bool start_pomo_again_container_enable_val = true;
 static char curr_streak_str[32] = "Streak: 0";
 static uint32_t streak_count = 0;
 
@@ -196,6 +197,14 @@ bool get_var_pomo_resting_container_enable() {
 
 void set_var_pomo_resting_container_enable(bool value) {
     pomo_resting_container_enable_val = value;
+}
+
+bool get_var_start_pomo_again_container_enable() {
+    return start_pomo_again_container_enable_val;
+}
+
+void set_var_start_pomo_again_container_enable(bool value) {
+    start_pomo_again_container_enable_val = value;
 }
 
 void app_play_chime(pomo_worker_event_t chime_ev) {
@@ -353,14 +362,15 @@ static void pomo_worker_task(void *arg) {
 
                                 set_var_timer_arc_value(0);
                                 set_var_session_start_stop_button_str("Start focus");
-                                set_var_tim_user_text_str("Select focus period");
+                                set_var_tim_user_text_str("Start another focus?");
                                 set_var_start_end_str("Start");
                                 update_pomo_period_display();
 
-                                // Reset containers visibility: show start, hide running/resting
-                                start_pomo_container_enable_val = false; // False = shown
-                                pomo_running_container_enable_val = true; // True = hidden
-                                pomo_resting_container_enable_val = true; // True = hidden
+                                // Reset containers visibility: show pomo again, hide start/running/resting
+                                start_pomo_container_enable_val = true;        // True = hidden
+                                pomo_running_container_enable_val = true;      // True = hidden
+                                pomo_resting_container_enable_val = true;      // True = hidden
+                                start_pomo_again_container_enable_val = false; // False = shown
 
                                 if (objects.icon_start_resume != NULL) {
                                     lv_image_set_src(objects.icon_start_resume, &img_play_arrow_bitmap);
@@ -403,10 +413,11 @@ static void start_resting_timer(uint32_t duration_seconds) {
         lv_obj_invalidate(objects.obj0);
     }
 
-    // Toggle container visibilities: hide start, hide running, show resting
+    // Toggle container visibilities: hide start, hide running, show resting, hide pomo again
     start_pomo_container_enable_val = true;   // True = hidden
     pomo_running_container_enable_val = true; // True = hidden
     pomo_resting_container_enable_val = false; // False = shown
+    start_pomo_again_container_enable_val = true; // True = hidden
 
     // Make sure FreeRTOS timer is running
     if (pomodoro.timer_handle == NULL) {
@@ -464,10 +475,11 @@ void start_timer(uint32_t duration_seconds) {
         lv_obj_invalidate(objects.obj0);
     }
 
-    // Toggle container visibilities: hide start, show running, hide resting
+    // Toggle container visibilities: hide start, show running, hide resting, hide pomo again
     start_pomo_container_enable_val = true;     // True = hidden
     pomo_running_container_enable_val = false;   // False = shown
     pomo_resting_container_enable_val = true;   // True = hidden
+    start_pomo_again_container_enable_val = true; // True = hidden
 
     // Set icon_start_resume to pause bitmap since it's running
     if (objects.icon_start_resume != NULL) {
@@ -535,10 +547,11 @@ void stop_timer() {
     set_var_start_end_str("Start");
     update_pomo_period_display();
 
-    // Toggle container visibilities: show start, hide running, hide resting
+    // Toggle container visibilities: show start, hide running, hide resting, hide pomo again
     start_pomo_container_enable_val = false;   // False = shown
     pomo_running_container_enable_val = true;  // True = hidden
     pomo_resting_container_enable_val = true;  // True = hidden
+    start_pomo_again_container_enable_val = true; // True = hidden
 
     // Set icon_start_resume back to play arrow
     if (objects.icon_start_resume != NULL) {
@@ -612,10 +625,11 @@ void app_logic_init() {
         xTaskCreatePinnedToCore(pomo_worker_task, "pomo_worker_task", 4096, NULL, 5, NULL, 1);
     }
     
-    // Initialize container visibilities: show start container, hide running container, hide resting container
+    // Initialize container visibilities: show start container, hide running/resting/pomo_again containers
     start_pomo_container_enable_val = false; // False = shown
     pomo_running_container_enable_val = true; // True = hidden
     pomo_resting_container_enable_val = true; // True = hidden
+    start_pomo_again_container_enable_val = true; // True = hidden
     plus_5_button_disabled_val = false;
     
     pomodoro.mode = POMO_STATE_IDLE;
@@ -682,16 +696,20 @@ void action_button_minus_pressed(lv_event_t * e) {
  * Start/stop the pomodoro timer with the selected period
  */
 void action_button_start_pomo_pressed(lv_event_t * e) {
-    lv_obj_t *target = lv_event_get_target(e);
-    if (target == objects.pomo_end_session_pressed) {
-        ESP_LOGI(TAG, "End session button pressed");
-        streak_count = 0;
-        snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: 0");
-        stop_timer();
-    } else {
-        ESP_LOGI(TAG, "Start focus button pressed; duration=%"PRIu32" seconds", pomo_tim_period_sec);
-        start_timer(pomo_tim_period_sec);
-    }
+    (void)e;  // unused
+    ESP_LOGI(TAG, "Start focus button pressed; duration=%"PRIu32" seconds", pomo_tim_period_sec);
+    start_timer(pomo_tim_period_sec);
+}
+
+/**
+ * End the pomodoro session
+ */
+void action_button_end_session_pressed(lv_event_t * e) {
+    (void)e;  // unused
+    ESP_LOGI(TAG, "End session button pressed");
+    streak_count = 0;
+    snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: 0");
+    stop_timer();
 }
 
 /**

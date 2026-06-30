@@ -1,9 +1,9 @@
 {
   "navigation": {
     "selectedUserPageObject": "[lockin_capstone.eez-project]:/userPages/0",
-    "selectedActionObject": "[lockin_capstone.eez-project]:/actions/8",
-    "selectedGlobalVariableObject": "[lockin_capstone.eez-project]:/variables/globalVariables/10",
-    "selectedBitmapObject": "[lockin_capstone.eez-project]:/bitmaps/5",
+    "selectedActionObject": "[lockin_capstone.eez-project]:/actions/12",
+    "selectedGlobalVariableObject": "[lockin_capstone.eez-project]:/variables/globalVariables/15",
+    "selectedBitmapObject": "[lockin_capstone.eez-project]:/bitmaps/4",
     "subnavigationSelectedItems": {
       "variables-tab/sub-navigation/selected-item": "Global"
     }
@@ -26,8 +26,8 @@
           },
           {
             "type": "border",
-            "selected": 1,
-            "size": 175.5,
+            "selected": 2,
+            "size": 233.5,
             "location": "right",
             "children": [
               {
@@ -122,12 +122,13 @@
             {
               "type": "row",
               "id": "#1c01432c-f0ed-4d59-917f-d9dc6a466cfa",
-              "weight": 23.241797094886664,
+              "weight": 32.65943347500474,
               "children": [
                 {
                   "type": "tabset",
                   "id": "#af60ef06-65c2-4a6e-947b-937200adf32e",
-                  "weight": 1,
+                  "weight": 0.7657992565055762,
+                  "selected": 2,
                   "enableClose": false,
                   "children": [
                     {
@@ -159,7 +160,7 @@
                 {
                   "type": "tabset",
                   "id": "#db1e603e-f69b-49e8-9082-5f763cc7d5fe",
-                  "weight": 0.7895652173913044,
+                  "weight": 1.2995600991325897,
                   "enableClose": false,
                   "children": [
                     {
@@ -175,7 +176,7 @@
                 {
                   "type": "tabset",
                   "id": "#d7ced149-9109-4e48-89f7-a05b448c8bf6",
-                  "weight": 1.2104347826086956,
+                  "weight": 0.9346406443618339,
                   "enableClose": false,
                   "children": [
                     {
@@ -193,7 +194,7 @@
             {
               "type": "tabset",
               "id": "EDITORS",
-              "weight": 46.13720465582997,
+              "weight": 33.15729069261152,
               "selected": 1,
               "enableDeleteWhenEmpty": false,
               "enableClose": false,
@@ -226,12 +227,12 @@
             {
               "type": "row",
               "id": "#a59f865c-1a2d-4400-b0f6-4f26c37743a1",
-              "weight": 30.620998249283335,
+              "weight": 34.18327583238371,
               "children": [
                 {
                   "type": "tabset",
                   "id": "#7756ed54-543f-422b-8fbf-b9e60fee0b97",
-                  "weight": 1.4740484429065743,
+                  "weight": 1.8680641183723798,
                   "children": [
                     {
                       "type": "tab",
@@ -246,7 +247,7 @@
                 {
                   "type": "tabset",
                   "id": "#84d0c87e-f60c-49d6-8b32-574cbcdf9b94",
-                  "weight": 1.5259515570934257,
+                  "weight": 1.1319358816276202,
                   "children": [
                     {
                       "type": "tab",
@@ -1092,15 +1093,23 @@
             "1": {},
             "2": {}
           },
-          "2": {}
+          "1": {
+            "0": {},
+            "1": {}
+          },
+          "2": {
+            "1": {},
+            "2": {}
+          },
+          "4": {}
         }
       },
       "transform": {
         "translate": {
-          "x": -298.491751469242,
-          "y": -355.6247508694755
+          "x": -216.14422602846938,
+          "y": -290.41232560863295
         },
-        "scale": 2.5
+        "scale": 1.75
       },
       "timeline": {
         "isEditorActive": false,
@@ -1124,7 +1133,7 @@
           "x": -157.62131313131312,
           "y": -304.6087878787877
         },
-        "scale": 2.5
+        "scale": 1.75
       },
       "timeline": {
         "isEditorActive": false,
@@ -1194,17 +1203,15 @@
   "showComponentDescriptions": true,
   "logsPanelFilter": "all",
   "selectedStylePropertyName": "",
-  "lvglPart": "KNOB",
+  "lvglPart": "MAIN",
   "lvglState": "DEFAULT",
   "lvglExpandedPropertiesGroup": [
-    "PADDING",
     "TEXT",
-    "LAYOUT",
-    "POSITION AND SIZE"
+    "BACKGROUND"
   ],
   "showInactiveFlowsInDebugger": true,
   "globalFlowZoom": true,
-  "flowZoom": 2.5,
+  "flowZoom": 1.75,
   "implementationLanguage": "C",
-  "openDialogDefaultPath": "/home/fera/Downloads/pause_35dp_E3E3E3_FILL0_wght400_GRAD0_opsz40.png"
+  "openDialogDefaultPath": "/home/fera/Downloads/fast_forward_35dp_E3E3E3_FILL0_wght400_GRAD0_opsz40.png"
 }
