@@ -412,6 +412,7 @@
                 "conditionalStyles": [],
                 "childStyles": []
               },
+              "hiddenInEditor": false,
               "timeline": [],
               "eventHandlers": [],
               "identifier": "container_pomo_resting",
@@ -435,6 +436,7 @@
                     "conditionalStyles": [],
                     "childStyles": []
                   },
+                  "hiddenInEditor": false,
                   "timeline": [],
                   "eventHandlers": [
                     {
@@ -466,6 +468,7 @@
                         "conditionalStyles": [],
                         "childStyles": []
                       },
+                      "hiddenInEditor": false,
                       "timeline": [],
                       "eventHandlers": [],
                       "identifier": "icon_fast_forward",
@@ -542,6 +545,7 @@
                     "conditionalStyles": [],
                     "childStyles": []
                   },
+                  "hiddenInEditor": false,
                   "timeline": [],
                   "eventHandlers": [
                     {
@@ -573,6 +577,7 @@
                         "conditionalStyles": [],
                         "childStyles": []
                       },
+                      "hiddenInEditor": false,
                       "timeline": [],
                       "eventHandlers": [],
                       "leftUnit": "px",
@@ -603,8 +608,8 @@
                       },
                       "group": "",
                       "groupIndex": 0,
-                      "text": "session_start_stop_button_str",
-                      "textType": "expression",
+                      "text": "End Session",
+                      "textType": "literal",
                       "longMode": "WRAP",
                       "recolor": false,
                       "previewValue": "End Session"
@@ -650,6 +655,7 @@
                     "conditionalStyles": [],
                     "childStyles": []
                   },
+                  "hiddenInEditor": false,
                   "timeline": [],
                   "eventHandlers": [
                     {
@@ -681,6 +687,7 @@
                         "conditionalStyles": [],
                         "childStyles": []
                       },
+                      "hiddenInEditor": false,
                       "timeline": [],
                       "eventHandlers": [],
                       "leftUnit": "px",
@@ -1427,11 +1434,11 @@
               "useAngle": false,
               "rangeMin": 0,
               "rangeMinType": "literal",
-              "rangeMax": 100,
+              "rangeMax": 360,
               "rangeMaxType": "literal",
               "value": "timer_arc_value",
               "valueType": "expression",
-              "previewValue": "25",
+              "previewValue": "100",
               "mode": "NORMAL",
               "startAngle": 135,
               "startAngleType": "literal",

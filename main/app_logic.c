@@ -248,10 +248,10 @@ static void update_arc_display() {
         set_var_display_tim_str("00:00");
         return;
     }
-    // Calculate arc value: 0-100 based on remaining time
-    int32_t arc_val = (pomodoro.remaining_sec * 100) / pomodoro.duration_sec;
+    // Calculate arc value: 0-360 based on remaining time
+    int32_t arc_val = (pomodoro.remaining_sec * 360) / pomodoro.duration_sec;
     if (arc_val < 0) arc_val = 0;
-    if (arc_val > 100) arc_val = 100;
+    if (arc_val > 360) arc_val = 360;
     set_var_timer_arc_value(arc_val);
     
     // Format remaining time as MM:SS and update display text
