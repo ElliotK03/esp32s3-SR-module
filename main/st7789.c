@@ -8,6 +8,7 @@
 #include <driver/spi_master.h>
 #include <driver/gpio.h>
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 
 #include "st7789.h"
 
@@ -112,35 +113,33 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
 	dev->_SPIHandle = handle;
 }
 
+// DMA bounce buffer in internal RAM — SPI DMA cannot source from PSRAM.
+// Shared across all calls; guarded by the single display task that calls us.
+#define SPI_BOUNCE_BUF_SIZE 4092
+static DRAM_ATTR uint8_t s_spi_bounce_buf[SPI_BOUNCE_BUF_SIZE];
+
 bool spi_master_write_byte(spi_device_handle_t SPIHandle, const uint8_t* Data, size_t DataLength)
 {
 	if (DataLength == 0) {
 		return true;
 	}
 
-	// Split large transfers into DMA-safe chunks. The SPI driver rejects
-	// oversized transactions even if the bus is configured with a large
-	// max_transfer_sz.
-	const size_t max_chunk = 4092;
 	size_t offset = 0;
 
 	while (offset < DataLength) {
 		size_t chunk_len = DataLength - offset;
-		if (chunk_len > max_chunk) {
-			chunk_len = max_chunk;
+		if (chunk_len > SPI_BOUNCE_BUF_SIZE) {
+			chunk_len = SPI_BOUNCE_BUF_SIZE;
 		}
 
+		// Copy from PSRAM (or anywhere) into the DMA-safe bounce buffer
+		memcpy(s_spi_bounce_buf, Data + offset, chunk_len);
+
 		spi_transaction_t SPITransaction;
-		esp_err_t ret;
 		memset(&SPITransaction, 0, sizeof(spi_transaction_t));
-		SPITransaction.length = chunk_len * 8;
-		SPITransaction.tx_buffer = Data + offset;
-#if 1
-		ret = spi_device_transmit(SPIHandle, &SPITransaction);
-#else
-		ret = spi_device_polling_transmit(SPIHandle, &SPITransaction);
-#endif
-		// assert(ret == ESP_OK);
+		SPITransaction.length    = chunk_len * 8;
+		SPITransaction.tx_buffer = s_spi_bounce_buf;
+		spi_device_transmit(SPIHandle, &SPITransaction);
 
 		offset += chunk_len;
 	}
