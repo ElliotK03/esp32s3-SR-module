@@ -10,6 +10,8 @@
 #include "images.h"
 #include "chime.h"
 #include "settings_manager.h"
+#include "connections.h"
+#include "esp_heap_caps.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -68,6 +70,20 @@ static char start_end_str[16] = "Start";
 static char wifi_status_str[50] = "Not connected";
 static char session_start_stop_button_str[32] = "Start focus";
 static char tim_user_text_str[32] = "Select focus period";
+
+// Session tracking state
+typedef struct {
+    uint32_t work_duration;
+    uint32_t break_duration;
+} round_info_t;
+
+#define MAX_ROUNDS 100
+static round_info_t *session_rounds = NULL;
+static bool session_active = false;
+static char session_id[37] = "";
+static char session_start_date[16] = "";
+static char session_start_time[16] = "";
+static int session_rounds_count = 0;
 
 // Pomodoro period (duration to set), in seconds
 static uint32_t pomo_tim_period_sec = 25 * 60;  // default 25 minutes
@@ -354,6 +370,10 @@ static void pomo_worker_task(void *arg) {
                                 pomodoro.mode = POMO_STATE_IDLE;
                                 pomodoro.has_added_5_min = false;
                                 
+                                if (session_rounds_count < MAX_ROUNDS) {
+                                    session_rounds_count++;
+                                }
+                                
                                 // Restore arc indicator color to default
                                 if (objects.obj0 != NULL) {
                                     lv_obj_remove_local_style_prop(objects.obj0, LV_STYLE_ARC_COLOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
@@ -397,6 +417,10 @@ static void pomo_worker_task(void *arg) {
 
 // ============= Start Resting Timer =============
 static void start_resting_timer(uint32_t duration_seconds) {
+    if (session_rounds != NULL && session_rounds_count < MAX_ROUNDS) {
+        session_rounds[session_rounds_count].break_duration = duration_seconds;
+    }
+
     pomodoro.duration_sec = duration_seconds;
     pomodoro.remaining_sec = duration_seconds;
     pomodoro.running = true;
@@ -460,6 +484,29 @@ void start_timer(uint32_t duration_seconds) {
     if (pomodoro.running) {
         ESP_LOGW(TAG, "Timer already running, stopping it first");
         stop_timer();
+    }
+
+    if (!session_active) {
+        session_active = true;
+        session_rounds_count = 0;
+        memset(session_id, 0, sizeof(session_id));
+        generate_session_id(session_id, sizeof(session_id));
+
+        time_t now;
+        struct tm timeinfo;
+        time(&now);
+        localtime_r(&now, &timeinfo);
+
+        strftime(session_start_date, sizeof(session_start_date), "%d/%m/%Y", &timeinfo);
+        strftime(session_start_time, sizeof(session_start_time), "%H:%M", &timeinfo);
+        
+        ESP_LOGI(TAG, "New session started: ID=%s, Date=%s, Time=%s",
+                 session_id, session_start_date, session_start_time);
+    }
+
+    if (session_rounds != NULL && session_rounds_count < MAX_ROUNDS) {
+        session_rounds[session_rounds_count].work_duration = duration_seconds;
+        session_rounds[session_rounds_count].break_duration = 0;
     }
     
     pomodoro.duration_sec = duration_seconds;
@@ -619,6 +666,15 @@ uint32_t get_remaining_time() {
 }
 
 void app_logic_init() {
+    // Allocate session rounds array in PSRAM (SPIRAM)
+    if (session_rounds == NULL) {
+        session_rounds = heap_caps_malloc(sizeof(round_info_t) * MAX_ROUNDS, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (session_rounds == NULL) {
+            ESP_LOGW(TAG, "Failed to allocate session_rounds in PSRAM, falling back to internal RAM");
+            session_rounds = malloc(sizeof(round_info_t) * MAX_ROUNDS);
+        }
+    }
+
     // Initialize worker task queue and task
     if (pomo_worker_queue == NULL) {
         pomo_worker_queue = xQueueCreate(10, sizeof(pomo_worker_event_t));
@@ -707,6 +763,53 @@ void action_button_start_pomo_pressed(lv_event_t * e) {
 void action_button_end_session_pressed(lv_event_t * e) {
     (void)e;  // unused
     ESP_LOGI(TAG, "End session button pressed");
+
+    if (session_active) {
+        // If we are currently in resting mode, the work duration has finished.
+        // We include this round in the push.
+        if (pomodoro.running && pomodoro.mode == POMO_STATE_RESTING) {
+            if (session_rounds_count < MAX_ROUNDS) {
+                session_rounds_count++;
+            }
+        }
+
+        // Only format and push if at least one full work session has completed!
+        if (session_rounds_count > 0) {
+            // Format the rounds in PSRAM
+            size_t rounds_buf_size = 4096;
+            char *rounds_str = heap_caps_malloc(rounds_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (rounds_str != NULL) {
+                size_t offset = 0;
+                int len = snprintf(rounds_str + offset, rounds_buf_size - offset, " \n");
+                if (len > 0) offset += len;
+
+                for (int i = 0; i < session_rounds_count; i++){
+                    len = snprintf(rounds_str + offset,
+                                   rounds_buf_size - offset,
+                                   "        %d: {%" PRIu32 ", %" PRIu32 "}\n",
+                                   i,
+                                   session_rounds[i].work_duration,
+                                   session_rounds[i].break_duration);
+                    if (len > 0){
+                        offset += len;
+                    }
+                }
+
+                len = snprintf(rounds_str + offset, rounds_buf_size - offset, "    ");
+                if (len > 0) offset += len;
+
+                // connections_push_session takes ownership of rounds_str and frees it
+                connections_push_session(session_id, session_start_date, session_start_time, session_rounds_count, rounds_str);
+            } else {
+                ESP_LOGE(TAG, "Failed to allocate rounds_str in PSRAM for session push");
+            }
+        } else {
+            ESP_LOGI(TAG, "Not even one full work session completed. Discarding session.");
+        }
+
+        session_active = false;
+    }
+
     streak_count = 0;
     snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: 0");
     stop_timer();
@@ -742,6 +845,10 @@ void action_plus_5_button_pressed(lv_event_t * e) {
         plus_5_button_disabled_val = true;
         update_arc_display();
         ESP_LOGI(TAG, "Added 5 minutes to resting timer. New remaining: %"PRIu32"s", pomodoro.remaining_sec);
+
+        if (session_rounds != NULL && session_rounds_count < MAX_ROUNDS) {
+            session_rounds[session_rounds_count].break_duration = pomodoro.duration_sec;
+        }
     }
 }
 

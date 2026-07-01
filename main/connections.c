@@ -25,6 +25,8 @@
 #include "esp_timer.h"
 #include "esp_system.h"
 #include "esp_mac.h"
+#include "esp_random.h"
+#include "esp_heap_caps.h"
 
 #include "app_logic.h"
 #include "connections.h"
@@ -480,74 +482,90 @@ static void sync_time(void) {
 
 // ── Firestore push ────────────────────────────────────────────────────────
 
-static void firestore_push_blink(int blink_count, bool led_on) {
-    // 1. Get current timestamp
+// ── Firestore push ────────────────────────────────────────────────────────
+
+static void firestore_push_blink(int blink_count, bool led_on)
+{
+    // Timestamp
     time_t now;
     time(&now);
     long long timestamp_ms = (long long)now * 1000;
 
-    // 2. Get RSSI correctly
+    // Wi-Fi RSSI
     int rssi = 0;
     esp_wifi_sta_get_rssi(&rssi);
 
-    // 3. Prepare strings for the JSON
-    char body[512];
-    char ts_str[32];
-    char count_str[16];
-    snprintf(ts_str, sizeof(ts_str), "%lld", timestamp_ms);
-    snprintf(count_str, sizeof(count_str), "%d", blink_count);
-
-    // 4. Build the JSON body
-    snprintf(body, sizeof(body),
-        "{"
-          "\"fields\":{"
-            "\"timestamp\":{\"integerValue\":\"%s\"},"
-            "\"blink_count\":{\"integerValue\":\"%s\"},"
-            "\"led_state\":{\"booleanValue\":%s},"
-            "\"wifi_rssi\":{\"integerValue\":\"%d\"},"
-            "\"free_heap_bytes\":{\"integerValue\":\"%d\"},"
-            "\"uptime_seconds\":{\"integerValue\":\"%d\"}"
-          "}"
-        "}",
-        ts_str,
-        count_str,
-        led_on ? "true" : "false",
-        rssi,
-        (int)esp_get_free_heap_size(), // heap
-        (int)(esp_timer_get_time() / 1000000) // uptime in seconds
-    ); 
-
+    // Device ID
     char device_id[18];
     get_device_id(device_id, sizeof(device_id));
 
-    // 5. Build URL
+    // JSON body
+    char body[512];
+    snprintf(body, sizeof(body),
+        "{"
+        "\"fields\":{"
+            "\"timestamp\":{\"integerValue\":\"%lld\"},"
+            "\"blink_count\":{\"integerValue\":\"%d\"},"
+            "\"led_state\":{\"booleanValue\":%s},"
+            "\"wifi_rssi\":{\"integerValue\":\"%d\"},"
+            "\"free_heap_bytes\":{\"integerValue\":\"%u\"},"
+            "\"uptime_seconds\":{\"integerValue\":\"%llu\"}"
+        "}"
+        "}",
+        timestamp_ms,
+        blink_count,
+        led_on ? "true" : "false",
+        rssi,
+        (unsigned int)esp_get_free_heap_size(),
+        (unsigned long long)(esp_timer_get_time() / 1000000ULL));
+
+    // Firestore document URL
     char url[512];
     snprintf(url, sizeof(url),
         "https://firestore.googleapis.com/v1/projects/%s"
         "/databases/(default)/documents/diagnostics/%s",
-        FIRESTORE_PROJECT_ID, device_id);
+        FIRESTORE_PROJECT_ID,
+        device_id);
 
-    // 6. HTTP POST CONFIGURATION
+    // ESP_LOGI(TAG, "Firestore URL: %s", url);
+    // ESP_LOGI(TAG, "Request Body: %s", body);
+
     esp_http_client_config_t config = {
         .url               = url,
-        .method            = HTTP_METHOD_POST,
+        .method            = HTTP_METHOD_PATCH,
         .timeout_ms        = 20000,
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
+
     esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_header(client, "Accept", "application/json");
+
+    // Uncomment if your Firestore requires authentication:
+    //
+    // esp_http_client_set_header(client,
+    //     "Authorization",
+    //     "Bearer YOUR_ACCESS_TOKEN");
+
     esp_http_client_set_post_field(client, body, strlen(body));
 
     esp_err_t err = esp_http_client_perform(client);
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Firestore ✓ blink=%d led=%s HTTP=%d",
-                 blink_count,
-                 led_on ? "ON" : "OFF",
-                 esp_http_client_get_status_code(client));
-    } else {
-        ESP_LOGE(TAG, "Firestore ✗ %s", esp_err_to_name(err));
+
+    if (err == ESP_OK){
+        int status = esp_http_client_get_status_code(client);
+
+        if (status >= 200 && status < 300){
+            ESP_LOGI(TAG, "Diagnostics upload ✓");
+        }
+        else{
+            ESP_LOGE(TAG, "Diagnostics upload ✗ (HTTP %d)", status);
+        }
     }
+    else{
+        ESP_LOGE(TAG, "Diagnostics upload ✗ (%s)", esp_err_to_name(err));
+    }
+
     esp_http_client_cleanup(client);
 }
 
@@ -641,5 +659,195 @@ void connections_init(void * arg) {
 
         run_pairing_session(saved_ssid, saved_pass, sizeof(saved_ssid));
         has_saved_credentials = saved_ssid[0] != '\0';
+    }
+}
+
+// ── Firestore session push ──────────────────────────────────────────────────
+
+static void escape_json_string(const char *src, char *dst, size_t dst_size) {
+    size_t j = 0;
+    for (size_t i = 0; src[i] != '\0' && j < dst_size - 1; i++) {
+        if (src[i] == '\n') {
+            if (j + 2 < dst_size) {
+                dst[j++] = '\\';
+                dst[j++] = 'n';
+            } else {
+                break;
+            }
+        } else if (src[i] == '\r') {
+            if (j + 2 < dst_size) {
+                dst[j++] = '\\';
+                dst[j++] = 'r';
+            } else {
+                break;
+            }
+        } else if (src[i] == '"') {
+            if (j + 2 < dst_size) {
+                dst[j++] = '\\';
+                dst[j++] = '"';
+            } else {
+                break;
+            }
+        } else if (src[i] == '\\') {
+            if (j + 2 < dst_size) {
+                dst[j++] = '\\';
+                dst[j++] = '\\';
+            } else {
+                break;
+            }
+        } else {
+            dst[j++] = src[i];
+        }
+    }
+    dst[j] = '\0';
+}
+
+void generate_session_id(char *buf, size_t len)
+{
+    uint32_t r1 = esp_random();
+    uint32_t r2 = esp_random();
+    uint32_t r3 = esp_random();
+    uint32_t r4 = esp_random();
+
+    // UUID version 4: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    r2 = (r2 & 0x0FFFFFFFUL) | 0x40000000UL;
+    r3 = (r3 & 0x3FFFFFFFUL) | 0x80000000UL;
+
+    snprintf(buf, len,
+             "%08" PRIx32 "-%04x-%04x-%04x-%012llx",
+             r1,
+             (uint16_t)(r2 >> 16),
+             (uint16_t)r2,
+             (uint16_t)(r3 >> 16),
+             ((unsigned long long)(r3 & 0xFFFFU) << 32) | r4);
+}
+
+typedef struct {
+    char session_id[37];
+    char start_date[16];
+    char start_time[16];
+    int num_rounds;
+    char *rounds_str; // Allocated in PSRAM, will be freed in this task
+} session_push_data_t;
+
+static void session_push_task(void *pvParameters) {
+    session_push_data_t *data = (session_push_data_t *)pvParameters;
+    if (data == NULL) {
+        vTaskDelete(NULL);
+        return;
+    }
+
+    size_t rounds_len = strlen(data->rounds_str);
+    size_t escaped_size = (rounds_len * 2) + 1;
+    char *escaped_rounds = heap_caps_malloc(escaped_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    
+    size_t body_size = escaped_size + 512;
+    char *body = heap_caps_malloc(body_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+
+    if (escaped_rounds == NULL || body == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate temporary buffers in PSRAM for session push");
+        if (escaped_rounds) heap_caps_free(escaped_rounds);
+        if (body) heap_caps_free(body);
+        if (data->rounds_str) heap_caps_free(data->rounds_str);
+        heap_caps_free(data);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    escape_json_string(data->rounds_str, escaped_rounds, escaped_size);
+
+    snprintf(body, body_size,
+        "{"
+          "\"fields\":{"
+            "\"sesstionStartDate\":{\"stringValue\":\"%s\"},"
+            "\"sessionStartTime\":{\"stringValue\":\"%s\"},"
+            "\"numberofRounds\":{\"integerValue\":\"%d\"},"
+            "\"rounds\":{\"stringValue\":\"%s\"}"
+          "}"
+        "}",
+        data->start_date,
+        data->start_time,
+        data->num_rounds,
+        escaped_rounds
+    );
+
+    char device_id[18];
+    get_device_id(device_id, sizeof(device_id));
+
+    char url[512];
+    snprintf(url, sizeof(url),
+        "https://firestore.googleapis.com/v1/projects/%s"
+        "/databases/(default)/documents/devices/%s/sessions?documentId=%s",
+        FIRESTORE_PROJECT_ID, device_id, data->session_id);
+
+    ESP_LOGI(TAG, "Pushing session to Firestore (async task) URL: %s", url);
+
+    esp_http_client_config_t config = {
+        .url               = url,
+        .method            = HTTP_METHOD_POST,
+        .timeout_ms        = 20000,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client != NULL) {
+        esp_http_client_set_header(client, "Content-Type", "application/json");
+        esp_http_client_set_post_field(client, body, strlen(body));
+
+        esp_err_t err = esp_http_client_perform(client);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Firestore session push ✓ HTTP=%d",
+                     esp_http_client_get_status_code(client));
+        } else {
+            ESP_LOGE(TAG, "Firestore session push ✗ %s", esp_err_to_name(err));
+        }
+        esp_http_client_cleanup(client);
+    } else {
+        ESP_LOGE(TAG, "Failed to initialize HTTP client");
+    }
+
+    heap_caps_free(escaped_rounds);
+    heap_caps_free(body);
+    if (data->rounds_str) heap_caps_free(data->rounds_str);
+    heap_caps_free(data);
+
+    vTaskDelete(NULL);
+}
+
+void connections_push_session(const char *session_id, const char *start_date, const char *start_time, int num_rounds, char *rounds_str) {
+    if (!connections_is_network_ready()) {
+        ESP_LOGW(TAG, "Wi-Fi not connected. Discarding session data.");
+        if (rounds_str) {
+            heap_caps_free(rounds_str);
+        }
+        return;
+    }
+
+    session_push_data_t *data = heap_caps_malloc(sizeof(session_push_data_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (data == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate session_push_data_t in PSRAM");
+        if (rounds_str) {
+            heap_caps_free(rounds_str);
+        }
+        return;
+    }
+
+    strncpy(data->session_id, session_id, sizeof(data->session_id) - 1);
+    data->session_id[sizeof(data->session_id) - 1] = '\0';
+
+    strncpy(data->start_date, start_date, sizeof(data->start_date) - 1);
+    data->start_date[sizeof(data->start_date) - 1] = '\0';
+
+    strncpy(data->start_time, start_time, sizeof(data->start_time) - 1);
+    data->start_time[sizeof(data->start_time) - 1] = '\0';
+
+    data->num_rounds = num_rounds;
+    data->rounds_str = rounds_str;
+
+    BaseType_t ret = xTaskCreate(session_push_task, "session_push_task", 8192, data, 5, NULL);
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create session_push_task");
+        if (rounds_str) heap_caps_free(rounds_str);
+        heap_caps_free(data);
     }
 }

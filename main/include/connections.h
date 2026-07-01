@@ -12,4 +12,14 @@ bool connections_is_network_ready(void);
  */
 void get_device_id(char *buf, size_t len);
 
+/*
+ * Generate a random UUID session ID
+ */
+void generate_session_id(char *buf, size_t len);
+
+/*
+ * Push session history to Firebase Firestore
+ */
+void connections_push_session(const char *session_id, const char *start_date, const char *start_time, int num_rounds, char *rounds_str);
+
 #endif

@@ -13,6 +13,9 @@ extern const lv_img_dsc_t img_brightness_bitmap;
 extern const lv_img_dsc_t img_play_arrow_bitmap;
 extern const lv_img_dsc_t img_stop_bitmap;
 extern const lv_img_dsc_t img_pause_bitmap;
+extern const lv_img_dsc_t img_ff_bitmap;
+extern const lv_img_dsc_t img_plus_bitmap;
+extern const lv_img_dsc_t img_minus_bitmap;
 
 #ifndef EXT_IMG_DESC_T
 #define EXT_IMG_DESC_T
@@ -22,7 +25,7 @@ typedef struct _ext_img_desc_t {
 } ext_img_desc_t;
 #endif
 
-extern const ext_img_desc_t images[6];
+extern const ext_img_desc_t images[9];
 
 #ifdef __cplusplus
 }
