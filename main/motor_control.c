@@ -10,8 +10,14 @@
 
 static const char *TAG_MOTOR = "motor";
 
-#define TIMER_RESOLUTION 80000000 // 80Mhz which is half of the 160Mhz source used
-#define COUNTER_PERIOD 8000 // 8000 ticks for 10kHz PWM
+#define TIMER_RESOLUTION 80000000  // 80 MHz (half of 160 MHz PLL source)
+#define COUNTER_PERIOD   8000      // 8000 ticks → 10 kHz PWM
+
+#define MOTOR_SPEED_PERCENT   50           // Duty cycle as a percentage of full speed
+#define MOTOR_DUTY            (COUNTER_PERIOD * MOTOR_SPEED_PERCENT / 100)
+#define MOTOR_RUN_MS          1500         // Maximum run time in ms
+#define MOTOR_SAMPLE_MS       200          // Current sampling interval in ms
+#define MOTOR_OVERCURRENT_MA  32.0f        // Stop threshold in mA
 
 static mcpwm_cmpr_handle_t cmp_m_a_h, cmp_m_a_l, cmp_m_b_h, cmp_m_b_l;
 static mcpwm_gen_handle_t gen_m_a_h, gen_m_a_l, gen_m_b_h, gen_m_b_l;
@@ -129,29 +135,31 @@ void motor_init(void) {
 static void motor_run_timer_task(void *pvParameters) {
     int dir = (int)pvParameters; // 1 = CW (lock), 2 = CCW (unlock)
     const char *dir_str = (dir == 1) ? "CW (Lock)" : "CCW (Unlock)";
+    ESP_LOGI(TAG_MOTOR, "Turning motor %s at %d%% speed...", dir_str, MOTOR_SPEED_PERCENT);
     if (dir == 1) {
-        ESP_LOGI(TAG_MOTOR, "Turning motor %s for 3 seconds...", dir_str);
-        motor_turn_cw(COUNTER_PERIOD);
+        motor_turn_cw(MOTOR_DUTY);
     } else {
-        ESP_LOGI(TAG_MOTOR, "Turning motor %s for 3 seconds...", dir_str);
-        motor_turn_ccw(COUNTER_PERIOD);
+        motor_turn_ccw(MOTOR_DUTY);
     }
 
-    // Sample current every 200ms during the 3-second run
-    const int run_ms      = 3000;
-    const int sample_ms   = 200;
-    const int samples     = run_ms / sample_ms;
+    const int   samples     = MOTOR_RUN_MS / MOTOR_SAMPLE_MS;
+    const float overcurrent = MOTOR_OVERCURRENT_MA;
 
     for (int i = 0; i < samples; i++) {
-        vTaskDelay(pdMS_TO_TICKS(sample_ms));
+        vTaskDelay(pdMS_TO_TICKS(MOTOR_SAMPLE_MS));
         float current_ma = 0.0f;
         esp_err_t err = ina226_read(NULL, NULL, &current_ma);
         if (err == ESP_OK) {
             ESP_LOGI(TAG_MOTOR, "[%s] t=%dms  I=%.1f mA",
-                     dir_str, (i + 1) * sample_ms, current_ma);
+                     dir_str, (i + 1) * MOTOR_SAMPLE_MS, current_ma);
+            if (current_ma >= overcurrent) {
+                ESP_LOGW(TAG_MOTOR, "[%s] Overcurrent %.1f mA >= %.0f mA — stopping early at %dms",
+                         dir_str, current_ma, overcurrent, (i + 1) * MOTOR_SAMPLE_MS);
+                break;
+            }
         } else {
             ESP_LOGW(TAG_MOTOR, "[%s] t=%dms  INA226 read error: %s",
-                     dir_str, (i + 1) * sample_ms, esp_err_to_name(err));
+                     dir_str, (i + 1) * MOTOR_SAMPLE_MS, esp_err_to_name(err));
         }
     }
 
@@ -168,7 +176,7 @@ static void trigger_motor_run(int dir) {
         motor_brake();
         motor_run_task_handle = NULL;
     }
-    xTaskCreate(motor_run_timer_task, "motor_run_timer_task", 2048, (void *)dir, 2, &motor_run_task_handle);
+    xTaskCreate(motor_run_timer_task, "motor_run_timer_task", 4096, (void *)dir, 2, &motor_run_task_handle);
 }
 
 void motor_lock(void) {
