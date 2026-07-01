@@ -3,9 +3,8 @@
 #include "ui.h"
 #include <lvgl.h>
 
-// Order of screens left-to-right: alarm, clock, main (default), settings
+// Order of screens left-to-right: clock, main (default), settings
 static const enum ScreensEnum screen_order[] = {
-    SCREEN_ID_ALARM,
     SCREEN_ID_CLOCK,
     SCREEN_ID_MAIN,
     SCREEN_ID_SETTINGS,
@@ -13,7 +12,7 @@ static const enum ScreensEnum screen_order[] = {
 static const int screen_count = sizeof(screen_order) / sizeof(screen_order[0]);
 
 // current index in screen_order; default to the index of SCREEN_ID_MAIN
-static int current_index = 2;
+static int current_index = 1;
 
 static int find_index_for_screen(enum ScreensEnum id) {
     for (int i = 0; i < screen_count; ++i) {
@@ -50,11 +49,11 @@ static void gesture_event_cb(lv_event_t * e) {
 void swipe_init(void) {
     // Ensure screens exist
     // Attach gesture handlers to root screen objects
-    lv_obj_t *scrs[] = { objects.alarm, objects.clock, objects.main, objects.settings };
+    lv_obj_t *scrs[] = { objects.clock, objects.main, objects.settings };
 
     // determine current index from loaded screen if possible
     int idx = find_index_for_screen(SCREEN_ID_MAIN);
-    if (idx >= 0) current_index = idx; // keep default at MAIN index (2)
+    if (idx >= 0) current_index = idx; // keep default at MAIN index (1)
 
     for (size_t i = 0; i < sizeof(scrs)/sizeof(scrs[0]); ++i) {
         if (scrs[i]) {

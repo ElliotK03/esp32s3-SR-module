@@ -601,33 +601,6 @@ void tick_screen_clock() {
     }
 }
 
-void create_screen_alarm() {
-    lv_obj_t *obj = lv_obj_create(0);
-    objects.alarm = obj;
-    lv_obj_set_pos(obj, 0, 0);
-    lv_obj_set_size(obj, 240, 320);
-    {
-        lv_obj_t *parent_obj = obj;
-        {
-            lv_obj_t *obj = lv_label_create(parent_obj);
-            lv_obj_set_pos(obj, 80, 104);
-            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-            lv_label_set_text_static(obj, "Alarm");
-        }
-        {
-            lv_obj_t *obj = lv_keyboard_create(parent_obj);
-            lv_obj_set_pos(obj, 10, 160);
-            lv_obj_set_size(obj, 220, 120);
-            lv_obj_set_style_align(obj, LV_ALIGN_DEFAULT, LV_PART_MAIN | LV_STATE_DEFAULT);
-        }
-    }
-    
-    tick_screen_alarm();
-}
-
-void tick_screen_alarm() {
-}
-
 void create_screen_settings() {
     lv_obj_t *obj = lv_obj_create(0);
     objects.settings = obj;
@@ -896,11 +869,10 @@ typedef void (*tick_screen_func_t)();
 tick_screen_func_t tick_screen_funcs[] = {
     tick_screen_main,
     tick_screen_clock,
-    tick_screen_alarm,
     tick_screen_settings,
 };
 void tick_screen(int screen_index) {
-    if (screen_index >= 0 && screen_index < 4) {
+    if (screen_index >= 0 && screen_index < 3) {
         tick_screen_funcs[screen_index]();
     }
 }
@@ -999,6 +971,5 @@ void create_screens() {
     // Create screens
     create_screen_main();
     create_screen_clock();
-    create_screen_alarm();
     create_screen_settings();
 }

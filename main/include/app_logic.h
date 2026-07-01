@@ -41,6 +41,10 @@ uint32_t get_pomo_period();
  * Check if timer is currently running
  */
 bool is_timer_running();
+bool is_timer_working(); // true only during POMO_STATE_WORKING (not rest)
+
+/* Start a work session, running the locker-box sequence first if connected */
+void app_logic_start_work_session(void);
 
 /**
  * Check if timer is currently paused

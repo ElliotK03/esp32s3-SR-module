@@ -71,9 +71,16 @@ static void start_resting_timer(uint32_t duration_seconds);
 static void pomo_worker_task(void *arg);
 static void update_pomo_period_display(void);
 static void update_arc_display(void);
+static void launch_work_session(uint32_t duration_sec);
 
 // Queue and task variables
 static QueueHandle_t pomo_worker_queue = NULL;
+
+// ── Locker box sequence ───────────────────────────────────────────────────
+#define LOCKER_INSERT_WAIT_MS   5000   // ms to wait for user to insert phone
+#define LOCKER_PROMPT_FLASH_MS  400    // ms per flash toggle during wait
+
+static uint32_t s_pending_work_duration_sec = 0;
 
 // ============= Variable Storage =============
 static int32_t timer_arc_value = 0;
@@ -356,6 +363,12 @@ static void work_done_post_flash(void)
 {
     streak_count++;
     snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: %"PRIu32, streak_count);
+
+    if (settings_manager_get()->locker_box_connected) {
+        if (g_unlock_cb) g_unlock_cb();
+        set_var_tim_user_text_str("Take your phone!");
+    }
+
     start_resting_timer(5 * 60);
 }
 
@@ -513,6 +526,65 @@ static void timer_callback(TimerHandle_t xTimer) {
         pomo_worker_event_t ev = POMO_EV_TICK;
         xQueueSend(pomo_worker_queue, &ev, 0);
     }
+}
+
+// ============= Locker box sequence =============
+
+static void async_set_prompt_insert(void *arg) {
+    set_var_tim_user_text_str("Insert phone");
+}
+
+static void async_restore_prompt(void *arg) {
+    update_tim_user_text();
+}
+
+// Flashes the user text label: called from a separate task via lv_async_call
+typedef struct { bool visible; } flash_toggle_arg_t;
+static DRAM_ATTR flash_toggle_arg_t s_flash_toggle;
+
+static void async_flash_toggle(void *arg) {
+    flash_toggle_arg_t *a = (flash_toggle_arg_t *)arg;
+    if (objects.time_text != NULL) {
+        if (a->visible)
+            lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+        else
+            lv_obj_add_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+static void async_start_timer_deferred(void *arg) {
+    uint32_t dur = (uint32_t)(uintptr_t)arg;
+    start_timer(dur);
+}
+
+// Runs on its own FreeRTOS task so the LVGL task is never blocked
+static void locker_box_sequence_task(void *arg) {
+    uint32_t duration_sec = (uint32_t)(uintptr_t)arg;
+
+    // 1. Unlock the box so the user can insert their phone
+    if (g_unlock_cb) g_unlock_cb();
+
+    // 2. Prompt the user
+    lv_async_call(async_set_prompt_insert, NULL);
+
+    // 3. Flash the prompt for LOCKER_INSERT_WAIT_MS
+    int toggles = LOCKER_INSERT_WAIT_MS / LOCKER_PROMPT_FLASH_MS;
+    for (int i = 0; i < toggles; i++) {
+        s_flash_toggle.visible = (i % 2 == 0);
+        lv_async_call(async_flash_toggle, &s_flash_toggle);
+        vTaskDelay(pdMS_TO_TICKS(LOCKER_PROMPT_FLASH_MS));
+    }
+    // Ensure label is visible again
+    s_flash_toggle.visible = true;
+    lv_async_call(async_flash_toggle, &s_flash_toggle);
+
+    // 4. Lock the box
+    if (g_lock_cb) g_lock_cb();
+
+    // 5. Start the actual timer (must run on LVGL task)
+    lv_async_call(async_start_timer_deferred, (void *)(uintptr_t)duration_sec);
+
+    vTaskDelete(NULL);
 }
 
 // ============= Public API =============
@@ -702,6 +774,14 @@ bool is_timer_paused() {
     return pomodoro.paused;
 }
 
+bool is_timer_working() {
+    return pomodoro.running && pomodoro.mode == POMO_STATE_WORKING;
+}
+
+void app_logic_start_work_session(void) {
+    launch_work_session(pomo_tim_period_sec);
+}
+
 uint32_t get_remaining_time() {
     return pomodoro.remaining_sec;
 }
@@ -805,10 +885,20 @@ void action_button_minus_pressed(lv_event_t * e) {
 /**
  * Start/stop the pomodoro timer with the selected period
  */
+static void launch_work_session(uint32_t duration_sec) {
+    if (settings_manager_get()->locker_box_connected) {
+        ESP_LOGI(TAG, "Locker box enabled — running insert sequence before starting timer");
+        xTaskCreate(locker_box_sequence_task, "locker_seq", 4096,
+                    (void *)(uintptr_t)duration_sec, 5, NULL);
+    } else {
+        start_timer(duration_sec);
+    }
+}
+
 void action_button_start_pomo_pressed(lv_event_t * e) {
-    (void)e;  // unused
+    (void)e;
     ESP_LOGI(TAG, "Start focus button pressed; duration=%"PRIu32" seconds", pomo_tim_period_sec);
-    start_timer(pomo_tim_period_sec);
+    launch_work_session(pomo_tim_period_sec);
 }
 
 /**
@@ -876,6 +966,12 @@ void action_button_end_session_pressed(lv_event_t * e) {
 
     streak_count = 0;
     snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: 0");
+
+    if (settings_manager_get()->locker_box_connected && g_unlock_cb != NULL) {
+        g_unlock_cb();
+        ESP_LOGI(TAG, "Session terminated — unlocking locker box");
+    }
+
     stop_timer();
 }
 
@@ -886,7 +982,7 @@ void action_button_start_resume_pressed(lv_event_t * e) {
     (void)e;
     ESP_LOGI(TAG, "Start/Resume (Pause/Resume) button pressed");
     if (!pomodoro.running) {
-        start_timer(pomo_tim_period_sec);
+        launch_work_session(pomo_tim_period_sec);
         return;
     }
     if (pomodoro.paused) {
@@ -1106,6 +1202,10 @@ static void locker_box_switch_event_cb(lv_event_t *e) {
 // ============= Lock/Unlock Button Actions =============
 void action_button_lock_pressed(lv_event_t * e) {
     (void)e;
+    if (settings_manager_get()->locker_box_connected && is_timer_working()) {
+        ESP_LOGW(TAG, "Lock ignored — locker box is managed during study session");
+        return;
+    }
     ESP_LOGI(TAG, "Lock button pressed");
     if (g_lock_cb != NULL) {
         g_lock_cb();
@@ -1116,6 +1216,10 @@ void action_button_lock_pressed(lv_event_t * e) {
 
 void action_button_unlock_pressed(lv_event_t * e) {
     (void)e;
+    if (settings_manager_get()->locker_box_connected && is_timer_working()) {
+        ESP_LOGW(TAG, "Unlock ignored — locker box is managed during study session");
+        return;
+    }
     ESP_LOGI(TAG, "Unlock button pressed");
     if (g_unlock_cb != NULL) {
         g_unlock_cb();

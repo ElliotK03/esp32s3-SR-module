@@ -119,7 +119,7 @@ void speech_commands_action(int command_id) {
   if (command_id == 1 || display_id == 1 || display_id == 14) {
     ESP_LOGI("Speech_commands_action", "Voice command: START TIMER");
     if (!is_timer_running()) {
-      start_timer(get_pomo_period());
+      app_logic_start_work_session();
     } else if (is_timer_paused()) {
       resume_timer();
     } else {
