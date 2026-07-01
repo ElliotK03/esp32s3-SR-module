@@ -897,7 +897,7 @@
                 "conditionalStyles": [],
                 "childStyles": []
               },
-              "hiddenInEditor": true,
+              "hiddenInEditor": false,
               "timeline": [],
               "eventHandlers": [],
               "identifier": "container_pomo_resting",
@@ -921,7 +921,7 @@
                     "conditionalStyles": [],
                     "childStyles": []
                   },
-                  "hiddenInEditor": true,
+                  "hiddenInEditor": false,
                   "timeline": [],
                   "eventHandlers": [
                     {
@@ -953,7 +953,7 @@
                         "conditionalStyles": [],
                         "childStyles": []
                       },
-                      "hiddenInEditor": true,
+                      "hiddenInEditor": false,
                       "timeline": [],
                       "eventHandlers": [],
                       "identifier": "icon_fast_forward",
@@ -1030,7 +1030,7 @@
                     "conditionalStyles": [],
                     "childStyles": []
                   },
-                  "hiddenInEditor": true,
+                  "hiddenInEditor": false,
                   "timeline": [],
                   "eventHandlers": [
                     {
@@ -1062,7 +1062,7 @@
                         "conditionalStyles": [],
                         "childStyles": []
                       },
-                      "hiddenInEditor": true,
+                      "hiddenInEditor": false,
                       "timeline": [],
                       "eventHandlers": [],
                       "identifier": "icon_end_session_1",
@@ -1139,7 +1139,7 @@
                     "conditionalStyles": [],
                     "childStyles": []
                   },
-                  "hiddenInEditor": true,
+                  "hiddenInEditor": false,
                   "timeline": [],
                   "eventHandlers": [
                     {
@@ -1171,7 +1171,7 @@
                         "conditionalStyles": [],
                         "childStyles": []
                       },
-                      "hiddenInEditor": true,
+                      "hiddenInEditor": false,
                       "timeline": [],
                       "eventHandlers": [],
                       "leftUnit": "px",
@@ -1270,7 +1270,7 @@
                 "conditionalStyles": [],
                 "childStyles": []
               },
-              "hiddenInEditor": false,
+              "hiddenInEditor": true,
               "timeline": [],
               "eventHandlers": [],
               "identifier": "container_pomo_running",
@@ -1294,7 +1294,7 @@
                     "conditionalStyles": [],
                     "childStyles": []
                   },
-                  "hiddenInEditor": false,
+                  "hiddenInEditor": true,
                   "timeline": [],
                   "eventHandlers": [
                     {
@@ -1326,7 +1326,7 @@
                         "conditionalStyles": [],
                         "childStyles": []
                       },
-                      "hiddenInEditor": false,
+                      "hiddenInEditor": true,
                       "timeline": [],
                       "eventHandlers": [],
                       "identifier": "icon_start_resume",
@@ -1404,7 +1404,7 @@
                     "conditionalStyles": [],
                     "childStyles": []
                   },
-                  "hiddenInEditor": false,
+                  "hiddenInEditor": true,
                   "timeline": [],
                   "eventHandlers": [
                     {
@@ -1436,7 +1436,7 @@
                         "conditionalStyles": [],
                         "childStyles": []
                       },
-                      "hiddenInEditor": false,
+                      "hiddenInEditor": true,
                       "timeline": [],
                       "eventHandlers": [],
                       "identifier": "icon_end_session",

@@ -395,6 +395,16 @@ static void reset_device_callback(void){
     // TODO: Implement device wifi reset code
 }
 
+static void lock_callback(void) {
+    motor_lock();
+    settings_manager_set_lock(true);
+}
+
+static void unlock_callback(void) {
+    motor_unlock();
+    settings_manager_set_lock(false);
+}
+
 void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {
   gpio_set_direction(scl, GPIO_MODE_OUTPUT);
   gpio_set_direction(sda, GPIO_MODE_INPUT);
@@ -501,8 +511,8 @@ void app_main() {
 #endif
 
     // Register UI logic callbacks
-    app_logic_register_lock_cb(motor_lock);
-    app_logic_register_unlock_cb(motor_unlock);
+    app_logic_register_lock_cb(lock_callback);
+    app_logic_register_unlock_cb(unlock_callback);
     app_logic_register_reset_cb(reset_device_callback);
     app_logic_register_start_pairing_cb(connections_start_pairing);
     app_logic_register_persist_brightness_cb(set_backlight_brightness);

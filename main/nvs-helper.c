@@ -46,3 +46,14 @@ esp_err_t get_settings_from_nvs(user_settings_t *p_settings) {
 
   return ret;
 }
+
+uint32_t nvs_read_sync_count(void) {
+  uint32_t val = 0;
+  nvs_get_u32(my_handle, "sync_count", &val);
+  return val;
+}
+
+void nvs_write_sync_count(uint32_t count) {
+  nvs_set_u32(my_handle, "sync_count", count);
+  nvs_commit(my_handle);
+}

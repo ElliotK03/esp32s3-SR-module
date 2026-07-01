@@ -4,9 +4,15 @@
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_helper.h"
+#include <inttypes.h>
 
 static const char *TAG = "SETTINGS_MGR";
-uint8_t count;
+
+// One-shot guard: skip applying voice settings on the very first init call
+static uint8_t s_init_guard;
+
+static uint32_t s_sync_count = 0;
+static bool s_needs_cloud_push = false;
 
 /* Cached copy – the only place the rest of the program reads from. */
 static user_settings_t cached_settings;
@@ -23,7 +29,7 @@ user_settings_t * get_cached_settings(){
 }
 
 void settings_manager_init(void) {
-  count = 0;
+  s_init_guard = 0;
   nvs_helper_init();
   /* Load from NVS (or fall back to defaults). */
   esp_err_t err = get_settings_from_nvs(&cached_settings);
@@ -37,13 +43,16 @@ void settings_manager_init(void) {
     cached_settings = (user_settings_t)USER_SETTINGS_DEFAULT;
   }
 
-  ESP_LOGI(TAG, "Settings loaded – applying");
+  s_sync_count = nvs_read_sync_count();
+
+  ESP_LOGI(TAG, "Settings loaded – applying (sync_count=%" PRIu32 ")", s_sync_count);
   apply_voice_settings(&cached_settings.voice);
   apply_pomodoro_settings(&cached_settings.pomodoro);
 
   ESP_LOGI(TAG, "Volume: %" PRIu8, cached_settings.voice.volume);
   ESP_LOGI(TAG, "Brightness: %" PRId32, cached_settings.brightness);
-  
+  ESP_LOGI(TAG, "Locked: %s", cached_settings.locked ? "yes" : "no");
+
   // Experimental, updating the values displayed by LVGL so value is correct on startup
   set_var_volume(cached_settings.voice.volume);
   set_var_screen_brightness_val(cached_settings.brightness);
@@ -70,7 +79,12 @@ esp_err_t settings_manager_set(const user_settings_t *new_settings) {
   apply_voice_settings(&cached_settings.voice);
   apply_pomodoro_settings(&cached_settings.pomodoro);
 
-  ESP_LOGI(TAG, "New settings applied");
+  /* Increment sync count and flag for cloud push */
+  s_sync_count++;
+  nvs_write_sync_count(s_sync_count);
+  s_needs_cloud_push = true;
+
+  ESP_LOGI(TAG, "New settings applied (sync_count=%" PRIu32 ")", s_sync_count);
   return ESP_OK;
 }
 
@@ -131,8 +145,8 @@ esp_err_t settings_manager_set_pomodoro_work(uint32_t secs) {
 
 static void apply_voice_settings(const voice_settings_t *vs) {
   /* Enable / disable the whole voice pipeline */
-  if (count == 0) {
-    count++;
+  if (s_init_guard == 0) {
+    s_init_guard++;
   } else {
     voice_module_set_enabled(vs->enabled);
 
@@ -154,6 +168,53 @@ static void apply_pomodoro_settings(const pomodoro_settings_t *ps) {
   /* Short / long break and session count are currently only used by
    * the higher‑level pomodoro state machine (not shown here).  If you
    * later need them, just expose similar wrappers. */
+}
+
+/* ------------------------------------------------------------------ */
+
+esp_err_t settings_manager_set_lock(bool locked) {
+  user_settings_t upd = cached_settings;
+  upd.locked = locked;
+  return settings_manager_set(&upd);
+}
+
+uint32_t settings_manager_get_sync_count(void) {
+  return s_sync_count;
+}
+
+bool settings_manager_needs_cloud_push(void) {
+  return s_needs_cloud_push;
+}
+
+void settings_manager_clear_cloud_push(void) {
+  s_needs_cloud_push = false;
+}
+
+void settings_manager_signal_cloud_push(void) {
+  s_needs_cloud_push = true;
+}
+
+esp_err_t settings_manager_apply_from_cloud(const user_settings_t *s, uint32_t cloud_count) {
+  if (!s) return ESP_ERR_INVALID_ARG;
+
+  esp_err_t err = write_settings_to_nvs((user_settings_t *)s);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "NVS write failed during cloud apply: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  cached_settings = *s;
+  s_sync_count = cloud_count;
+  nvs_write_sync_count(cloud_count);
+  s_needs_cloud_push = false;
+
+  apply_voice_settings(&cached_settings.voice);
+  apply_pomodoro_settings(&cached_settings.pomodoro);
+  set_var_volume(cached_settings.voice.volume);
+  set_var_screen_brightness_val(cached_settings.brightness);
+
+  ESP_LOGI(TAG, "Cloud settings applied (sync_count=%" PRIu32 ")", cloud_count);
+  return ESP_OK;
 }
 
 /* ------------------------------------------------------------------ */

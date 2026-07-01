@@ -52,6 +52,9 @@ esp_err_t write_settings_to_nvs(user_settings_t *p_settings);
  */
 esp_err_t get_settings_from_nvs(user_settings_t *p_settings);
 
+uint32_t nvs_read_sync_count(void);
+void     nvs_write_sync_count(uint32_t count);
+
 #ifdef __cplusplus
 }
 #endif

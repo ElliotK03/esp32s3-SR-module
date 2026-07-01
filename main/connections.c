@@ -31,6 +31,8 @@
 
 #include "app_logic.h"
 #include "connections.h"
+#include "settings_manager.h"
+#include "motor_control.h"
 
 static const char *TAG = "provisioning";
 
@@ -483,8 +485,6 @@ static void sync_time(void) {
 
 // ── Firestore push ────────────────────────────────────────────────────────
 
-// ── Firestore push ────────────────────────────────────────────────────────
-
 static void firestore_push_blink(int blink_count, bool led_on)
 {
     // Timestamp
@@ -570,21 +570,216 @@ static void firestore_push_blink(int blink_count, bool led_on)
     esp_http_client_cleanup(client);
 }
 
+// ── Device settings sync ──────────────────────────────────────────────────
+
+typedef struct {
+    char *buffer;
+    int   buffer_len;
+} http_recv_buf_t;
+
+static esp_err_t http_recv_handler(esp_http_client_event_t *evt) {
+    http_recv_buf_t *resp = (http_recv_buf_t *)evt->user_data;
+    if (evt->event_id == HTTP_EVENT_ON_DATA) {
+        int new_len = resp->buffer_len + evt->data_len;
+        char *new_buf = realloc(resp->buffer, new_len + 1);
+        if (new_buf) {
+            resp->buffer = new_buf;
+            memcpy(resp->buffer + resp->buffer_len, evt->data, evt->data_len);
+            resp->buffer_len = new_len;
+            resp->buffer[resp->buffer_len] = '\0';
+        }
+    }
+    return ESP_OK;
+}
+
+static void firestore_push_device_settings(void) {
+    const user_settings_t *s = settings_manager_get();
+    uint32_t sync_count = settings_manager_get_sync_count();
+
+    char device_id[18];
+    get_device_id(device_id, sizeof(device_id));
+
+    // Use updateMask so we only overwrite these four fields, leaving sessions sub-collection untouched
+    char url[384];
+    snprintf(url, sizeof(url),
+        "https://firestore.googleapis.com/v1/projects/%s"
+        "/databases/(default)/documents/devices/%s"
+        "?updateMask.fieldPaths=lock_status"
+        "&updateMask.fieldPaths=speaker_volume"
+        "&updateMask.fieldPaths=screen_brightness"
+        "&updateMask.fieldPaths=sync_count",
+        FIRESTORE_PROJECT_ID, device_id);
+
+    char body[256];
+    snprintf(body, sizeof(body),
+        "{"
+          "\"fields\":{"
+            "\"lock_status\":{\"stringValue\":\"%s\"},"
+            "\"speaker_volume\":{\"integerValue\":\"%" PRIu8 "\"},"
+            "\"screen_brightness\":{\"integerValue\":\"%" PRId32 "\"},"
+            "\"sync_count\":{\"integerValue\":\"%" PRIu32 "\"}"
+          "}"
+        "}",
+        s->locked ? "LOCKED" : "UNLOCKED",
+        s->voice.volume,
+        s->brightness,
+        sync_count);
+
+    esp_http_client_config_t config = {
+        .url               = url,
+        .method            = HTTP_METHOD_PATCH,
+        .timeout_ms        = 20000,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_post_field(client, body, strlen(body));
+
+    esp_err_t err = esp_http_client_perform(client);
+    if (err == ESP_OK) {
+        int status = esp_http_client_get_status_code(client);
+        if (status >= 200 && status < 300) {
+            ESP_LOGI(TAG, "Device settings push ✓ (count=%" PRIu32 ")", sync_count);
+            settings_manager_clear_cloud_push();
+        } else {
+            ESP_LOGE(TAG, "Device settings push ✗ HTTP %d", status);
+        }
+    } else {
+        ESP_LOGE(TAG, "Device settings push failed: %s", esp_err_to_name(err));
+    }
+    esp_http_client_cleanup(client);
+}
+
+static void firestore_fetch_device_settings(void) {
+    char device_id[18];
+    get_device_id(device_id, sizeof(device_id));
+
+    char url[256];
+    snprintf(url, sizeof(url),
+        "https://firestore.googleapis.com/v1/projects/%s"
+        "/databases/(default)/documents/devices/%s",
+        FIRESTORE_PROJECT_ID, device_id);
+
+    http_recv_buf_t response = {.buffer = NULL, .buffer_len = 0};
+
+    esp_http_client_config_t config = {
+        .url               = url,
+        .method            = HTTP_METHOD_GET,
+        .timeout_ms        = 10000,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .event_handler     = http_recv_handler,
+        .user_data         = &response,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_err_t err = esp_http_client_perform(client);
+
+    if (err == ESP_OK) {
+        int status = esp_http_client_get_status_code(client);
+        // Close client before parsing to avoid heap corruption (same pattern as main copy.c)
+        esp_http_client_cleanup(client);
+        client = NULL;
+
+        if (status == 200 && response.buffer) {
+            cJSON *root = cJSON_Parse(response.buffer);
+            if (root) {
+                cJSON *fields = cJSON_GetObjectItem(root, "fields");
+                if (fields) {
+                    // Read cloud sync_count
+                    uint32_t cloud_count = 0;
+                    cJSON *count_obj = cJSON_GetObjectItem(fields, "sync_count");
+                    if (count_obj) {
+                        cJSON *iv = cJSON_GetObjectItem(count_obj, "integerValue");
+                        if (iv && cJSON_IsString(iv))      cloud_count = (uint32_t)atol(iv->valuestring);
+                        else if (iv && cJSON_IsNumber(iv)) cloud_count = (uint32_t)iv->valuedouble;
+                    }
+
+                    uint32_t local_count = settings_manager_get_sync_count();
+
+                    if (cloud_count > local_count) {
+                        // Cloud is newer — build a new settings struct from cloud values
+                        user_settings_t new_s = *settings_manager_get();
+
+                        cJSON *lock_obj = cJSON_GetObjectItem(fields, "lock_status");
+                        if (lock_obj) {
+                            cJSON *sv = cJSON_GetObjectItem(lock_obj, "stringValue");
+                            if (sv && cJSON_IsString(sv)) {
+                                bool cloud_locked = (strcmp(sv->valuestring, "LOCKED") == 0);
+                                if (cloud_locked != new_s.locked) {
+                                    new_s.locked = cloud_locked;
+                                    if (cloud_locked) motor_lock(); else motor_unlock();
+                                }
+                            }
+                        }
+
+                        cJSON *vol_obj = cJSON_GetObjectItem(fields, "speaker_volume");
+                        if (vol_obj) {
+                            cJSON *iv = cJSON_GetObjectItem(vol_obj, "integerValue");
+                            int vol = -1;
+                            if (iv && cJSON_IsString(iv))      vol = atoi(iv->valuestring);
+                            else if (iv && cJSON_IsNumber(iv)) vol = (int)iv->valuedouble;
+                            if (vol >= 0 && vol <= 100) new_s.voice.volume = (uint8_t)vol;
+                        }
+
+                        cJSON *bright_obj = cJSON_GetObjectItem(fields, "screen_brightness");
+                        if (bright_obj) {
+                            cJSON *iv = cJSON_GetObjectItem(bright_obj, "integerValue");
+                            int bright = -1;
+                            if (iv && cJSON_IsString(iv))      bright = atoi(iv->valuestring);
+                            else if (iv && cJSON_IsNumber(iv)) bright = (int)iv->valuedouble;
+                            if (bright >= 0 && bright <= 100) new_s.brightness = bright;
+                        }
+
+                        settings_manager_apply_from_cloud(&new_s, cloud_count);
+                        ESP_LOGI(TAG, "Cloud settings applied (cloud=%" PRIu32 " > local=%" PRIu32 ")",
+                                 cloud_count, local_count);
+                    }
+                    // local_count >= cloud_count: local is authoritative, no action here
+                }
+                cJSON_Delete(root);
+            }
+        } else if (status != 200) {
+            ESP_LOGW(TAG, "Device settings fetch HTTP %d", status);
+        }
+    } else {
+        ESP_LOGE(TAG, "Device settings fetch failed: %s", esp_err_to_name(err));
+    }
+
+    if (client) esp_http_client_cleanup(client);
+    if (response.buffer) free(response.buffer);
+}
+
 // ── Blink task ────────────────────────────────────────────────────────────
 static void firebase_task(void *arg) {
-
     int blink_count = 0;
+    bool initial_sync_done = false;
 
     while (true) {
         if (!s_network_ready) {
+            initial_sync_done = false;
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
 
+        // On first connection push local state so cloud reflects device
+        if (!initial_sync_done) {
+            settings_manager_signal_cloud_push();
+            initial_sync_done = true;
+        }
+
         blink_count++;
         firestore_push_blink(blink_count, true);
-        vTaskDelay(pdMS_TO_TICKS(5000));
 
+        // Push local changes to cloud before fetching, so we don't immediately overwrite them
+        if (settings_manager_needs_cloud_push()) {
+            firestore_push_device_settings();
+        }
+
+        // Poll cloud; applies cloud settings only if cloud_count > local_count
+        firestore_fetch_device_settings();
+
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 

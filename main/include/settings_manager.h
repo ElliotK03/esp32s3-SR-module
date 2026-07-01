@@ -30,8 +30,22 @@ esp_err_t settings_manager_set_wakenet_threshold(float th);
 esp_err_t settings_manager_set_volume(uint8_t vol);
 esp_err_t settings_manager_set_pomodoro_work(uint32_t secs);
 esp_err_t settings_manager_set_brightness(int32_t brightness);
+esp_err_t settings_manager_set_lock(bool locked);
 
-/* 
+/*
  * Return cached settings, do not directly modify the contents
  */
 user_settings_t * get_cached_settings();
+
+/* Cloud sync count — incremented on every local change, persisted in NVS */
+uint32_t settings_manager_get_sync_count(void);
+
+/* Called by connections.c to apply cloud-sourced settings without
+ * triggering a re-push back to the cloud. Updates cache, NVS, and
+ * sets sync_count to cloud_count. */
+esp_err_t settings_manager_apply_from_cloud(const user_settings_t *s, uint32_t cloud_count);
+
+/* Dirty flag — set true whenever a local change should be pushed to cloud */
+bool settings_manager_needs_cloud_push(void);
+void settings_manager_clear_cloud_push(void);
+void settings_manager_signal_cloud_push(void);
