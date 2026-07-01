@@ -1034,18 +1034,28 @@ void action_button_fast_forward_pressed(lv_event_t * e) {
 
 // ============= Clock/Time Variables for GUI =============
 static char clock_str[32] = "";
+static char clock_seconds_str[8] = "";
 static char date_str[32] = "";
 static char day_str[32] = "";
 
-const char *get_var_clcok_str() {
+static void clock_fill_timeinfo(struct tm *out) {
     time_t now;
-    struct tm timeinfo;
     time(&now);
-    localtime_r(&now, &timeinfo);
-    
-    // 24 hour format: 09:30:12
-    strftime(clock_str, sizeof(clock_str), "%H:%M:%S", &timeinfo);
+    localtime_r(&now, out);
+}
+
+const char *get_var_clcok_str() {
+    struct tm t;
+    clock_fill_timeinfo(&t);
+    strftime(clock_str, sizeof(clock_str), "%I:%M %p", &t);
     return clock_str;
+}
+
+const char *get_var_clock_seconds_str() {
+    struct tm t;
+    clock_fill_timeinfo(&t);
+    strftime(clock_seconds_str, sizeof(clock_seconds_str), ":%S", &t);
+    return clock_seconds_str;
 }
 
 void set_var_clcok_str(const char *value) {
@@ -1061,8 +1071,7 @@ const char *get_var_date_str() {
     time(&now);
     localtime_r(&now, &timeinfo); 
 
-    // date in dd/mm/yyyy format
-    strftime(date_str, sizeof(date_str), "%d/%m/%Y", &timeinfo);
+    strftime(date_str, sizeof(date_str), "%d %b %Y", &timeinfo);
     return date_str;
 }
 

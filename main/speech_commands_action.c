@@ -15,6 +15,7 @@
 #include "esp_board_init.h"
 #include "speech_commands_action.h"
 #include "app_logic.h"
+#include "screen_swipe.h"
 // #include "led_strip_types.h"
 
 #include "reent.h"
@@ -115,6 +116,9 @@ void speech_commands_action(int command_id) {
   int display_id = command_id + 1;
   ESP_LOGI("Speech_commands_action", "Recognized command, raw ID: %d, display ID: %d",
            command_id, display_id);
+
+  // Wake ambient clock and return to main screen on any recognised command
+  clock_ambient_wake();
 
   if (command_id == 1 || display_id == 1 || display_id == 14) {
     ESP_LOGI("Speech_commands_action", "Voice command: START TIMER");

@@ -531,43 +531,86 @@ void tick_screen_main() {
     }
 }
 
+static lv_obj_t *s_clock_sec_label = NULL;
+
 void create_screen_clock() {
-    lv_obj_t *obj = lv_obj_create(0);
-    objects.clock = obj;
-    lv_obj_set_pos(obj, 0, 0);
-    lv_obj_set_size(obj, 240, 320);
+    lv_obj_t *screen = lv_obj_create(0);
+    objects.clock = screen;
+    lv_obj_set_pos(screen, 0, 0);
+    lv_obj_set_size(screen, 240, 320);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x0d0d0d), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Day of week label — e.g. "Wednesday"
     {
-        lv_obj_t *parent_obj = obj;
-        {
-            // clock_text
-            lv_obj_t *obj = lv_label_create(parent_obj);
-            objects.clock_text = obj;
-            lv_obj_set_pos(obj, 26, 69);
-            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-            lv_obj_set_style_text_font(obj, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_label_set_text(obj, "");
-        }
-        {
-            // clock_text_1
-            lv_obj_t *obj = lv_label_create(parent_obj);
-            objects.clock_text_1 = obj;
-            lv_obj_set_pos(obj, 60, 146);
-            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-            lv_obj_set_style_text_font(obj, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_label_set_text(obj, "");
-        }
-        {
-            // clock_text_2
-            lv_obj_t *obj = lv_label_create(parent_obj);
-            objects.clock_text_2 = obj;
-            lv_obj_set_pos(obj, 79, 200);
-            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-            lv_obj_set_style_text_font(obj, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_label_set_text(obj, "");
-        }
+        lv_obj_t *obj = lv_label_create(screen);
+        objects.clock_text_2 = obj;
+        lv_obj_set_width(obj, 240);
+        lv_obj_align(obj, LV_ALIGN_TOP_MID, 0, 52);
+        lv_obj_set_style_text_font(obj, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(obj, lv_color_hex(0x7b8fa1), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_label_set_text(obj, "");
     }
-    
+
+    // Accent divider bar
+    {
+        lv_obj_t *bar = lv_obj_create(screen);
+        lv_obj_set_size(bar, 60, 3);
+        lv_obj_align(bar, LV_ALIGN_TOP_MID, 0, 86);
+        lv_obj_set_style_bg_color(bar, lv_color_hex(0x2196f3), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_radius(bar, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+    }
+
+    // Time display — "02:32 PM", large and centred
+    {
+        lv_obj_t *obj = lv_label_create(screen);
+        objects.clock_text = obj;
+        lv_obj_set_width(obj, 240);
+        lv_obj_align(obj, LV_ALIGN_TOP_MID, 0, 106);
+        lv_obj_set_style_text_font(obj, &lv_font_montserrat_48, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(obj, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_label_set_text(obj, "");
+    }
+
+    // Seconds — small, dimmed, below and right-of-centre, ticks every second
+    {
+        lv_obj_t *obj = lv_label_create(screen);
+        s_clock_sec_label = obj;
+        lv_obj_align(obj, LV_ALIGN_TOP_MID, 52, 162);
+        lv_obj_set_style_text_font(obj, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(obj, lv_color_hex(0x6b9ab8), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_label_set_text(obj, ":00");
+    }
+
+    // Thin separator under time + seconds
+    {
+        lv_obj_t *sep = lv_obj_create(screen);
+        lv_obj_set_size(sep, 140, 1);
+        lv_obj_align(sep, LV_ALIGN_TOP_MID, 0, 194);
+        lv_obj_set_style_bg_color(sep, lv_color_hex(0x2a2a2a), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(sep, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(sep, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(sep, LV_OBJ_FLAG_SCROLLABLE);
+    }
+
+    // Date label — e.g. "02 Jul 2026"
+    {
+        lv_obj_t *obj = lv_label_create(screen);
+        objects.clock_text_1 = obj;
+        lv_obj_set_width(obj, 240);
+        lv_obj_align(obj, LV_ALIGN_TOP_MID, 0, 208);
+        lv_obj_set_style_text_font(obj, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(obj, lv_color_hex(0x555e66), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_label_set_text(obj, "");
+    }
+
     tick_screen_clock();
 }
 
@@ -597,6 +640,13 @@ void tick_screen_clock() {
             tick_value_change_obj = objects.clock_text_2;
             lv_label_set_text(objects.clock_text_2, new_val);
             tick_value_change_obj = NULL;
+        }
+    }
+    if (s_clock_sec_label) {
+        const char *new_val = get_var_clock_seconds_str();
+        const char *cur_val = lv_label_get_text(s_clock_sec_label);
+        if (strcmp(new_val, cur_val) != 0) {
+            lv_label_set_text(s_clock_sec_label, new_val);
         }
     }
 }

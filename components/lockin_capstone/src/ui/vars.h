@@ -43,6 +43,7 @@ extern const char *get_var_start_end_str();
 extern void set_var_start_end_str(const char *value);
 extern const char *get_var_clcok_str();
 extern void set_var_clcok_str(const char *value);
+extern const char *get_var_clock_seconds_str();
 extern const char *get_var_date_str();
 extern void set_var_date_str(const char *value);
 extern const char *get_var_day_str();

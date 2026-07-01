@@ -84,6 +84,8 @@ void set_var_screen_brightness_val(int32_t value);
 int32_t get_var_volume();
 void set_var_volume(int32_t value);
 
+const char *get_var_clock_seconds_str();
+
 const char *get_var_wifi_status_str();
 void set_var_wifi_status_str(const char *value);
 

@@ -7,6 +7,8 @@
 */
 
 #include "audio-sr.h"
+#include "screen_swipe.h"
+#include "misc/lv_async.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
@@ -124,6 +126,7 @@ void detect_Task(void *arg) {
         ESP_LOGI("detect_Task", "WAKEWORD DETECTED");
         multinet->clean(model_data);
         app_play_chime(POMO_EV_PLAY_CHIME_WAKE);
+        lv_async_call((lv_async_cb_t)clock_ambient_brighten, NULL);
       }
 
       if (res->raw_data_channels == 1 &&
