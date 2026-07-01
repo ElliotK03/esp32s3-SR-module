@@ -35,6 +35,7 @@ set(srcs
     connections.c
     motor_control.c
     settings_manager.c
+    ina226.c
 )
 
 idf_component_register(SRCS ${srcs}

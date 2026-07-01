@@ -6,6 +6,7 @@
 #include "esp_log.h"
 
 #include "pinout.h"
+#include "ina226.h"
 
 static const char *TAG_MOTOR = "motor";
 
@@ -127,15 +128,32 @@ void motor_init(void) {
 
 static void motor_run_timer_task(void *pvParameters) {
     int dir = (int)pvParameters; // 1 = CW (lock), 2 = CCW (unlock)
+    const char *dir_str = (dir == 1) ? "CW (Lock)" : "CCW (Unlock)";
     if (dir == 1) {
-        ESP_LOGI(TAG_MOTOR, "Turning motor CW (Lock) for 3 seconds...");
+        ESP_LOGI(TAG_MOTOR, "Turning motor %s for 3 seconds...", dir_str);
         motor_turn_cw(COUNTER_PERIOD);
     } else {
-        ESP_LOGI(TAG_MOTOR, "Turning motor CCW (Unlock) for 3 seconds...");
+        ESP_LOGI(TAG_MOTOR, "Turning motor %s for 3 seconds...", dir_str);
         motor_turn_ccw(COUNTER_PERIOD);
     }
 
-    vTaskDelay(pdMS_TO_TICKS(3000));
+    // Sample current every 200ms during the 3-second run
+    const int run_ms      = 3000;
+    const int sample_ms   = 200;
+    const int samples     = run_ms / sample_ms;
+
+    for (int i = 0; i < samples; i++) {
+        vTaskDelay(pdMS_TO_TICKS(sample_ms));
+        float current_ma = 0.0f;
+        esp_err_t err = ina226_read(NULL, NULL, &current_ma);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG_MOTOR, "[%s] t=%dms  I=%.1f mA",
+                     dir_str, (i + 1) * sample_ms, current_ma);
+        } else {
+            ESP_LOGW(TAG_MOTOR, "[%s] t=%dms  INA226 read error: %s",
+                     dir_str, (i + 1) * sample_ms, esp_err_to_name(err));
+        }
+    }
 
     ESP_LOGI(TAG_MOTOR, "Braking motor...");
     motor_brake();

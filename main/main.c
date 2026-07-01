@@ -30,6 +30,7 @@
 #include "connections.h"
 #include "i2c_handlers.h"
 #include "motor_control.h"
+#include "ina226.h"
 
 #define ENABLE_AUDIO_SR 1
 #define SUSPEND_AUDIO_GPIO 0
@@ -214,6 +215,12 @@ static void tp_init(void) {
             ESP_LOGI(TAG_TOUCH, "Touch interrupt enabled on GPIO %d", TP_INT);
         } else {
             ESP_LOGW(TAG_TOUCH, "Touch panel not detected at address 0x%02x after %d attempts (err=%s)", FT6236_ADDR, max_retries, esp_err_to_name(ret));
+        }
+
+        // Probe INA226 current sensor on the same bus
+        esp_err_t ina_err = ina226_init();
+        if (ina_err != ESP_OK) {
+            ESP_LOGW(TAG_TOUCH, "INA226 not found or init failed: %s", esp_err_to_name(ina_err));
         }
     } else {
         ESP_LOGE(TAG_TOUCH, "I2C Init Failed.");
