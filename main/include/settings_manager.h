@@ -31,6 +31,8 @@ esp_err_t settings_manager_set_volume(uint8_t vol);
 esp_err_t settings_manager_set_pomodoro_work(uint32_t secs);
 esp_err_t settings_manager_set_brightness(int32_t brightness);
 esp_err_t settings_manager_set_lock(bool locked);
+esp_err_t settings_manager_set_locker_box_connected(bool connected);
+esp_err_t settings_manager_set_lock_manual_override(bool enabled);
 
 /*
  * Return cached settings, do not directly modify the contents

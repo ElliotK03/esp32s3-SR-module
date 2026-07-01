@@ -53,14 +53,15 @@ typedef struct _objects_t {
     lv_obj_t *clock_text_2;
     lv_obj_t *screen_brightness_slider;
     lv_obj_t *volume_slider;
-    lv_obj_t *locker_lock;
-    lv_obj_t *locker_unlock;
+    lv_obj_t *pair_button;
     lv_obj_t *reset_button;
+    lv_obj_t *locker_unlock;
+    lv_obj_t *locker_lock;
     lv_obj_t *wifi_status;
     lv_obj_t *wifi_logo;
     lv_obj_t *volume_logo;
     lv_obj_t *brightness_logo;
-    lv_obj_t *pair_button;
+    lv_obj_t *phone_locker_box_enabled;
 } objects_t;
 
 extern objects_t objects;

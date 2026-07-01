@@ -110,6 +110,11 @@ void app_logic_register_unlock_cb(void (*cb)(void));
 void app_logic_register_reset_cb(void (*cb)(void));
 void app_logic_register_start_pairing_cb(void (*cb)(void));
 
+/* Called when the locker-box switch is flipped OFF → ON */
+void app_logic_register_locker_box_connected_cb(void (*cb)(void));
+/* Called when the locker-box switch is flipped ON → OFF */
+void app_logic_register_locker_box_disconnected_cb(void (*cb)(void));
+
 // Timer functions for external code
 void toggle_pomo_timer();
 

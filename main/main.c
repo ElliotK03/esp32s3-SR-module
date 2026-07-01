@@ -395,14 +395,22 @@ static void reset_device_callback(void){
     // TODO: Implement device wifi reset code
 }
 
+DRAM_ATTR static bool temp_lock_state;
+static void write_nvs_lock_task(void *arg) {
+    settings_manager_set_lock(temp_lock_state);
+    vTaskDelete(NULL);
+}
+
 static void lock_callback(void) {
     motor_lock();
-    settings_manager_set_lock(true);
+    temp_lock_state = true;
+    xTaskCreate(write_nvs_lock_task, "nvs_lock", 3000, NULL, 5, NULL);
 }
 
 static void unlock_callback(void) {
     motor_unlock();
-    settings_manager_set_lock(false);
+    temp_lock_state = false;
+    xTaskCreate(write_nvs_lock_task, "nvs_lock", 3000, NULL, 5, NULL);
 }
 
 void i2c_bus_recovery(gpio_num_t scl, gpio_num_t sda) {

@@ -19,13 +19,22 @@
 
 static void (*g_persist_brightness_cb)(int32_t) = NULL;
 static void (*g_lock_cb)(void) = NULL;
-static void (*g_unlock_cb)(void) = NULL;    
+static void (*g_unlock_cb)(void) = NULL;
 static void (*g_reset_cb)(void) = NULL;
 static void (*g_start_pairing_cb)(void) = NULL;
 static void (*g_volume_release)(int32_t) = NULL;
 static void (*g_brightness_release)(int32_t) = NULL;
+static void (*g_locker_box_connected_cb)(void) = NULL;
+static void (*g_locker_box_disconnected_cb)(void) = NULL;
 
 void app_logic_set_work_duration(uint32_t secs);
+static void locker_box_switch_event_cb(lv_event_t *e);
+static void write_nvs_manual_override_task(void *arg);
+
+// DRAM: these must not be in PSRAM so NVS tasks can safely read them
+DRAM_ATTR static bool locker_box_nvs_val;
+DRAM_ATTR static bool manual_override_nvs_val;
+
 static const char *TAG = "APP_LOGIC";
 
 // ============= Timer State =============
@@ -224,6 +233,16 @@ bool get_var_start_pomo_again_container_enable() {
 
 void set_var_start_pomo_again_container_enable(bool value) {
     start_pomo_again_container_enable_val = value;
+}
+
+bool get_var_lock_manual_override_enabled() {
+    return settings_manager_get()->lock_manual_override;
+}
+
+void set_var_lock_manual_override_enabled(bool value) {
+    if (settings_manager_get()->lock_manual_override == value) return;
+    manual_override_nvs_val = value;
+    xTaskCreate(write_nvs_manual_override_task, "nvs_override", 3000, NULL, 5, NULL);
 }
 
 void app_play_chime(pomo_worker_event_t chime_ev) {
@@ -721,6 +740,19 @@ void app_logic_init() {
     update_pomo_period_display();
     set_var_session_start_stop_button_str("Start focus");
     set_var_tim_user_text_str("Select focus period");
+
+    // Restore locker box switch state and attach its event handler
+    if (objects.phone_locker_box_enabled != NULL) {
+        bool connected = settings_manager_get()->locker_box_connected;
+        if (connected) {
+            lv_obj_add_state(objects.phone_locker_box_enabled, LV_STATE_CHECKED);
+        } else {
+            lv_obj_remove_state(objects.phone_locker_box_enabled, LV_STATE_CHECKED);
+        }
+        lv_obj_add_event_cb(objects.phone_locker_box_enabled,
+                            locker_box_switch_event_cb,
+                            LV_EVENT_VALUE_CHANGED, NULL);
+    }
 }
 
 // ============= EEZ Studio Action Handlers =============
@@ -1033,6 +1065,42 @@ void app_logic_register_volume_released_cb(void (*cb)(int32_t)) {
 
 void app_logic_register_brightness_released_cb(void (*cb)(int32_t)) {
     g_brightness_release = cb;
+}
+
+void app_logic_register_locker_box_connected_cb(void (*cb)(void)) {
+    g_locker_box_connected_cb = cb;
+}
+
+void app_logic_register_locker_box_disconnected_cb(void (*cb)(void)) {
+    g_locker_box_disconnected_cb = cb;
+}
+
+static void write_nvs_locker_box_task(void *arg) {
+    settings_manager_set_locker_box_connected(locker_box_nvs_val);
+    vTaskDelete(NULL);
+}
+
+static void write_nvs_manual_override_task(void *arg) {
+    settings_manager_set_lock_manual_override(manual_override_nvs_val);
+    vTaskDelete(NULL);
+}
+
+static void locker_box_switch_event_cb(lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
+
+    lv_obj_t *sw = lv_event_get_target(e);
+    bool is_on = lv_obj_has_state(sw, LV_STATE_CHECKED);
+
+    locker_box_nvs_val = is_on;
+    xTaskCreate(write_nvs_locker_box_task, "nvs_locker_box", 3000, NULL, 5, NULL);
+
+    ESP_LOGI(TAG, "Locker box switch → %s", is_on ? "connected" : "disconnected");
+
+    if (is_on && g_locker_box_connected_cb != NULL) {
+        g_locker_box_connected_cb();
+    } else if (!is_on && g_locker_box_disconnected_cb != NULL) {
+        g_locker_box_disconnected_cb();
+    }
 }
 
 // ============= Lock/Unlock Button Actions =============

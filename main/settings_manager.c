@@ -178,6 +178,18 @@ esp_err_t settings_manager_set_lock(bool locked) {
   return settings_manager_set(&upd);
 }
 
+esp_err_t settings_manager_set_locker_box_connected(bool connected) {
+  user_settings_t upd = cached_settings;
+  upd.locker_box_connected = connected;
+  return settings_manager_set(&upd);
+}
+
+esp_err_t settings_manager_set_lock_manual_override(bool enabled) {
+  user_settings_t upd = cached_settings;
+  upd.lock_manual_override = enabled;
+  return settings_manager_set(&upd);
+}
+
 uint32_t settings_manager_get_sync_count(void) {
   return s_sync_count;
 }

@@ -599,31 +599,34 @@ static void firestore_push_device_settings(void) {
     char device_id[18];
     get_device_id(device_id, sizeof(device_id));
 
-    // Use updateMask so we only overwrite these four fields, leaving sessions sub-collection untouched
-    char url[384];
+    // Use updateMask so we only overwrite these fields, leaving sessions sub-collection untouched
+    char url[512];
     snprintf(url, sizeof(url),
         "https://firestore.googleapis.com/v1/projects/%s"
         "/databases/(default)/documents/devices/%s"
         "?updateMask.fieldPaths=lock_status"
         "&updateMask.fieldPaths=speaker_volume"
         "&updateMask.fieldPaths=screen_brightness"
-        "&updateMask.fieldPaths=sync_count",
+        "&updateMask.fieldPaths=sync_count"
+        "&updateMask.fieldPaths=lock_manual_override",
         FIRESTORE_PROJECT_ID, device_id);
 
-    char body[256];
+    char body[320];
     snprintf(body, sizeof(body),
         "{"
           "\"fields\":{"
             "\"lock_status\":{\"stringValue\":\"%s\"},"
             "\"speaker_volume\":{\"integerValue\":\"%" PRIu8 "\"},"
             "\"screen_brightness\":{\"integerValue\":\"%" PRId32 "\"},"
-            "\"sync_count\":{\"integerValue\":\"%" PRIu32 "\"}"
+            "\"sync_count\":{\"integerValue\":\"%" PRIu32 "\"},"
+            "\"lock_manual_override\":{\"booleanValue\":%s}"
           "}"
         "}",
         s->locked ? "LOCKED" : "UNLOCKED",
         s->voice.volume,
         s->brightness,
-        sync_count);
+        sync_count,
+        s->lock_manual_override ? "true" : "false");
 
     esp_http_client_config_t config = {
         .url               = url,
@@ -729,6 +732,12 @@ static void firestore_fetch_device_settings(void) {
                             if (iv && cJSON_IsString(iv))      bright = atoi(iv->valuestring);
                             else if (iv && cJSON_IsNumber(iv)) bright = (int)iv->valuedouble;
                             if (bright >= 0 && bright <= 100) new_s.brightness = bright;
+                        }
+
+                        cJSON *override_obj = cJSON_GetObjectItem(fields, "lock_manual_override");
+                        if (override_obj) {
+                            cJSON *bv = cJSON_GetObjectItem(override_obj, "booleanValue");
+                            if (bv && cJSON_IsBool(bv)) new_s.lock_manual_override = cJSON_IsTrue(bv);
                         }
 
                         settings_manager_apply_from_cloud(&new_s, cloud_count);
