@@ -1,8 +1,8 @@
 {
   "navigation": {
     "selectedUserPageObject": "[lockin_capstone.eez-project]:/userPages/0",
-    "selectedActionObject": "[lockin_capstone.eez-project]:/actions/12",
-    "selectedGlobalVariableObject": "[lockin_capstone.eez-project]:/variables/globalVariables/15",
+    "selectedActionObject": "[lockin_capstone.eez-project]:/actions/9",
+    "selectedGlobalVariableObject": "[lockin_capstone.eez-project]:/variables/globalVariables/16",
     "selectedBitmapObject": "[lockin_capstone.eez-project]:/bitmaps/4",
     "subnavigationSelectedItems": {
       "variables-tab/sub-navigation/selected-item": "Global"
@@ -194,7 +194,7 @@
             {
               "type": "tabset",
               "id": "EDITORS",
-              "weight": 33.15729069261152,
+              "weight": 50.50542489374641,
               "selected": 1,
               "enableDeleteWhenEmpty": false,
               "enableClose": false,
@@ -227,7 +227,7 @@
             {
               "type": "row",
               "id": "#a59f865c-1a2d-4400-b0f6-4f26c37743a1",
-              "weight": 34.18327583238371,
+              "weight": 16.835141631248803,
               "children": [
                 {
                   "type": "tabset",
@@ -1089,19 +1089,19 @@
       "selectionBack": {
         "0": {
           "0": {
-            "0": {},
-            "1": {},
-            "2": {}
+            "2": {},
+            "3": {}
           },
           "1": {
             "0": {},
-            "1": {}
-          },
-          "2": {
             "1": {},
             "2": {}
           },
-          "4": {}
+          "3": {
+            "1": {},
+            "2": {}
+          },
+          "5": {}
         }
       },
       "transform": {

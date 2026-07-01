@@ -648,7 +648,7 @@
                   "type": "LVGLButtonWidget",
                   "left": 33,
                   "top": 58,
-                  "width": 88,
+                  "width": 72,
                   "height": 47,
                   "customInputs": [],
                   "customOutputs": [],
