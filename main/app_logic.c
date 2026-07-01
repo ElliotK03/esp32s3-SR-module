@@ -12,6 +12,7 @@
 #include "settings_manager.h"
 #include "connections.h"
 #include "esp_heap_caps.h"
+#include "misc/lv_async.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -59,6 +60,8 @@ static void timer_callback(TimerHandle_t xTimer);
 void stop_timer();
 static void start_resting_timer(uint32_t duration_seconds);
 static void pomo_worker_task(void *arg);
+static void update_pomo_period_display(void);
+static void update_arc_display(void);
 
 // Queue and task variables
 static QueueHandle_t pomo_worker_queue = NULL;
@@ -289,6 +292,103 @@ static void update_arc_display() {
     update_tim_user_text();
 }
 
+// ── Flash animation (runs on LVGL task via lv_async_call / lv_timer) ─────────
+typedef struct {
+    lv_timer_t *timer;
+    int remaining;
+    void (*done_cb)(void);
+} flash_ctx_t;
+
+static flash_ctx_t s_flash_ctx;
+
+static void flash_timer_cb(lv_timer_t *t)
+{
+    flash_ctx_t *ctx = (flash_ctx_t *)lv_timer_get_user_data(t);
+    if (ctx->remaining <= 0) {
+        lv_timer_delete(t);
+        ctx->timer = NULL;
+        if (objects.time_text != NULL)
+            lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+        if (ctx->done_cb)
+            ctx->done_cb();
+        return;
+    }
+    ctx->remaining--;
+    if (objects.time_text != NULL) {
+        if (lv_obj_has_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN))
+            lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+        else
+            lv_obj_add_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+static void start_flash_then(int toggles, void (*done_cb)(void))
+{
+    if (s_flash_ctx.timer != NULL) {
+        lv_timer_delete(s_flash_ctx.timer);
+        s_flash_ctx.timer = NULL;
+    }
+    s_flash_ctx.remaining = toggles;
+    s_flash_ctx.done_cb   = done_cb;
+    s_flash_ctx.timer     = lv_timer_create(flash_timer_cb, 300, &s_flash_ctx);
+}
+
+static void work_done_post_flash(void)
+{
+    streak_count++;
+    snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: %"PRIu32, streak_count);
+    start_resting_timer(5 * 60);
+}
+
+static void rest_done_post_flash(void)
+{
+    pomodoro.paused          = false;
+    pomodoro.mode            = POMO_STATE_IDLE;
+    pomodoro.has_added_5_min = false;
+
+    if (session_rounds_count < MAX_ROUNDS)
+        session_rounds_count++;
+
+    if (objects.obj0 != NULL) {
+        lv_obj_remove_local_style_prop(objects.obj0, LV_STYLE_ARC_COLOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_invalidate(objects.obj0);
+    }
+
+    set_var_timer_arc_value(0);
+    set_var_session_start_stop_button_str("Start focus");
+    set_var_tim_user_text_str("Start another focus?");
+    set_var_start_end_str("Start");
+    update_pomo_period_display();
+
+    start_pomo_container_enable_val       = true;
+    pomo_running_container_enable_val     = true;
+    pomo_resting_container_enable_val     = true;
+    start_pomo_again_container_enable_val = false;
+
+    if (objects.icon_start_resume != NULL)
+        lv_image_set_src(objects.icon_start_resume, &img_play_arrow_bitmap);
+
+    if (objects.pomo_start_end_button != NULL) {
+        lv_obj_remove_local_style_prop(objects.pomo_start_end_button, LV_STYLE_BG_COLOR, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_invalidate(objects.pomo_start_end_button);
+        lv_obj_t *label = lv_obj_get_child(objects.pomo_start_end_button, 0);
+        if (label != NULL)
+            lv_label_set_text(label, "Start focus");
+    }
+}
+
+static void async_start_work_done_flash(void *arg)
+{
+    (void)arg;
+    start_flash_then(10, work_done_post_flash);
+}
+
+static void async_start_rest_done_flash(void *arg)
+{
+    (void)arg;
+    start_flash_then(10, rest_done_post_flash);
+}
+
 // ============= Unified pomo Worker Task & Helpers =============
 static void pomo_worker_task(void *arg) {
     pomo_worker_event_t ev;
@@ -313,97 +413,19 @@ static void pomo_worker_task(void *arg) {
                         } else {
                             if (pomodoro.mode == POMO_STATE_WORKING) {
                                 ESP_LOGI(TAG, "Work session finished!");
-                                
-                                // Stop timer during 3 seconds flashing delay
                                 xTimerStop(pomodoro.timer_handle, 0);
                                 pomodoro.running = false;
-                                
                                 chime_play_work_done();
-                                
-                                // Stay at work timer 00:00 and flash text for 3 seconds (10 toggles * 300ms)
-                                for (int i = 0; i < 10; i++) {
-                                    if (objects.time_text != NULL) {
-                                        if (lv_obj_has_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN)) {
-                                            lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
-                                        } else {
-                                            lv_obj_add_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
-                                        }
-                                    }
-                                    vTaskDelay(pdMS_TO_TICKS(300));
-                                }
-                                if (objects.time_text != NULL) {
-                                    lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
-                                }
-                                
-                                streak_count++;
-                                snprintf(curr_streak_str, sizeof(curr_streak_str), "Streak: %"PRIu32, streak_count);
-                                
-                                // Auto start resting timer (default 5 minutes = 300 seconds)
-                                uint32_t rest_duration = 5 * 60;
-                                start_resting_timer(rest_duration);
-                                
+                                // Hand off flash + post-flash transitions to the LVGL task
+                                lv_async_call(async_start_work_done_flash, NULL);
+
                             } else if (pomodoro.mode == POMO_STATE_RESTING) {
                                 ESP_LOGI(TAG, "Resting session finished!");
-                                
-                                // Stop timer during 3 seconds flashing delay
                                 xTimerStop(pomodoro.timer_handle, 0);
                                 pomodoro.running = false;
-                                
                                 chime_play_rest_done();
-                                
-                                // Stay at 00:00 and flash text for 3 seconds (10 toggles * 300ms)
-                                for (int i = 0; i < 10; i++) {
-                                    if (objects.time_text != NULL) {
-                                        if (lv_obj_has_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN)) {
-                                            lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
-                                        } else {
-                                            lv_obj_add_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
-                                        }
-                                    }
-                                    vTaskDelay(pdMS_TO_TICKS(300));
-                                }
-                                if (objects.time_text != NULL) {
-                                    lv_obj_remove_flag(objects.time_text, LV_OBJ_FLAG_HIDDEN);
-                                }
-                                
-                                pomodoro.paused = false;
-                                pomodoro.mode = POMO_STATE_IDLE;
-                                pomodoro.has_added_5_min = false;
-                                
-                                if (session_rounds_count < MAX_ROUNDS) {
-                                    session_rounds_count++;
-                                }
-                                
-                                // Restore arc indicator color to default
-                                if (objects.obj0 != NULL) {
-                                    lv_obj_remove_local_style_prop(objects.obj0, LV_STYLE_ARC_COLOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-                                    lv_obj_invalidate(objects.obj0);
-                                }
-
-                                set_var_timer_arc_value(0);
-                                set_var_session_start_stop_button_str("Start focus");
-                                set_var_tim_user_text_str("Start another focus?");
-                                set_var_start_end_str("Start");
-                                update_pomo_period_display();
-
-                                // Reset containers visibility: show pomo again, hide start/running/resting
-                                start_pomo_container_enable_val = true;        // True = hidden
-                                pomo_running_container_enable_val = true;      // True = hidden
-                                pomo_resting_container_enable_val = true;      // True = hidden
-                                start_pomo_again_container_enable_val = false; // False = shown
-
-                                if (objects.icon_start_resume != NULL) {
-                                    lv_image_set_src(objects.icon_start_resume, &img_play_arrow_bitmap);
-                                }
-                                
-                                if (objects.pomo_start_end_button != NULL) {
-                                    lv_obj_remove_local_style_prop(objects.pomo_start_end_button, LV_STYLE_BG_COLOR, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                    lv_obj_invalidate(objects.pomo_start_end_button);
-                                    lv_obj_t *label = lv_obj_get_child(objects.pomo_start_end_button, 0);
-                                    if (label != NULL) {
-                                        lv_label_set_text(label, "Start focus");
-                                    }
-                                }
+                                // Hand off flash + post-flash transitions to the LVGL task
+                                lv_async_call(async_start_rest_done_flash, NULL);
                             }
                         }
                     }
@@ -775,6 +797,15 @@ void action_button_end_session_pressed(lv_event_t * e) {
 
         // Only format and push if at least one full work session has completed!
         if (session_rounds_count > 0) {
+            // Compute totals and averages
+            uint32_t total_work_sec = 0, total_rest_sec = 0;
+            for (int i = 0; i < session_rounds_count; i++) {
+                total_work_sec += session_rounds[i].work_duration;
+                total_rest_sec += session_rounds[i].break_duration;
+            }
+            uint32_t avg_work_sec = total_work_sec / (uint32_t)session_rounds_count;
+            uint32_t avg_rest_sec = total_rest_sec / (uint32_t)session_rounds_count;
+
             // Format the rounds in PSRAM
             size_t rounds_buf_size = 4096;
             char *rounds_str = heap_caps_malloc(rounds_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -799,7 +830,8 @@ void action_button_end_session_pressed(lv_event_t * e) {
                 if (len > 0) offset += len;
 
                 // connections_push_session takes ownership of rounds_str and frees it
-                connections_push_session(session_id, session_start_date, session_start_time, session_rounds_count, rounds_str);
+                connections_push_session(session_id, session_start_date, session_start_time, session_rounds_count, rounds_str,
+                                         total_work_sec, avg_work_sec, total_rest_sec, avg_rest_sec);
             } else {
                 ESP_LOGE(TAG, "Failed to allocate rounds_str in PSRAM for session push");
             }
@@ -859,6 +891,11 @@ void action_button_fast_forward_pressed(lv_event_t * e) {
     (void)e;
     ESP_LOGI(TAG, "Fast forward resting period button pressed");
     if (pomodoro.running && pomodoro.mode == POMO_STATE_RESTING) {
+        // Record only the time actually spent resting, not the full planned duration
+        uint32_t elapsed = pomodoro.duration_sec - pomodoro.remaining_sec;
+        if (session_rounds != NULL && session_rounds_count < MAX_ROUNDS) {
+            session_rounds[session_rounds_count].break_duration = elapsed;
+        }
         pomodoro.remaining_sec = 0;
         if (pomo_worker_queue != NULL) {
             pomo_worker_event_t ev = POMO_EV_TICK;

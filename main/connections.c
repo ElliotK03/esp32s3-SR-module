@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -728,6 +729,10 @@ typedef struct {
     char start_time[16];
     int num_rounds;
     char *rounds_str; // Allocated in PSRAM, will be freed in this task
+    uint32_t total_work_sec;
+    uint32_t avg_work_sec;
+    uint32_t total_rest_sec;
+    uint32_t avg_rest_sec;
 } session_push_data_t;
 
 static void session_push_task(void *pvParameters) {
@@ -762,13 +767,21 @@ static void session_push_task(void *pvParameters) {
             "\"sesstionStartDate\":{\"stringValue\":\"%s\"},"
             "\"sessionStartTime\":{\"stringValue\":\"%s\"},"
             "\"numberofRounds\":{\"integerValue\":\"%d\"},"
-            "\"rounds\":{\"stringValue\":\"%s\"}"
+            "\"rounds\":{\"stringValue\":\"%s\"},"
+            "\"totalWorkSec\":{\"integerValue\":\"%" PRIu32 "\"},"
+            "\"avgWorkSec\":{\"integerValue\":\"%" PRIu32 "\"},"
+            "\"totalRestSec\":{\"integerValue\":\"%" PRIu32 "\"},"
+            "\"avgRestSec\":{\"integerValue\":\"%" PRIu32 "\"}"
           "}"
         "}",
         data->start_date,
         data->start_time,
         data->num_rounds,
-        escaped_rounds
+        escaped_rounds,
+        data->total_work_sec,
+        data->avg_work_sec,
+        data->total_rest_sec,
+        data->avg_rest_sec
     );
 
     char device_id[18];
@@ -814,7 +827,8 @@ static void session_push_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
-void connections_push_session(const char *session_id, const char *start_date, const char *start_time, int num_rounds, char *rounds_str) {
+void connections_push_session(const char *session_id, const char *start_date, const char *start_time, int num_rounds, char *rounds_str,
+                              uint32_t total_work_sec, uint32_t avg_work_sec, uint32_t total_rest_sec, uint32_t avg_rest_sec) {
     if (!connections_is_network_ready()) {
         ESP_LOGW(TAG, "Wi-Fi not connected. Discarding session data.");
         if (rounds_str) {
@@ -843,6 +857,10 @@ void connections_push_session(const char *session_id, const char *start_date, co
 
     data->num_rounds = num_rounds;
     data->rounds_str = rounds_str;
+    data->total_work_sec = total_work_sec;
+    data->avg_work_sec = avg_work_sec;
+    data->total_rest_sec = total_rest_sec;
+    data->avg_rest_sec = avg_rest_sec;
 
     BaseType_t ret = xTaskCreate(session_push_task, "session_push_task", 8192, data, 5, NULL);
     if (ret != pdPASS) {

@@ -20,6 +20,7 @@ void generate_session_id(char *buf, size_t len);
 /*
  * Push session history to Firebase Firestore
  */
-void connections_push_session(const char *session_id, const char *start_date, const char *start_time, int num_rounds, char *rounds_str);
+void connections_push_session(const char *session_id, const char *start_date, const char *start_time, int num_rounds, char *rounds_str,
+                              uint32_t total_work_sec, uint32_t avg_work_sec, uint32_t total_rest_sec, uint32_t avg_rest_sec);
 
 #endif
