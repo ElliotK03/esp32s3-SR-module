@@ -78,10 +78,12 @@ esp_err_t settings_manager_set(const user_settings_t *new_settings) {
     return err;
   }
 
-  /* Update the in‑RAM copy and push the changes downstream. */
+  /* Update the in‑RAM copy and push audio changes downstream.
+   * Pomodoro settings are NOT applied here — only settings_manager_set_pomodoro_work
+   * and settings_manager_init should touch the period, so that volume/brightness/lock
+   * NVS writes don't silently overwrite the user's current in-session period selection. */
   cached_settings = *new_settings;
   apply_voice_settings(&cached_settings.voice);
-  apply_pomodoro_settings(&cached_settings.pomodoro);
 
   /* Increment sync count and flag for cloud push */
   s_sync_count++;
@@ -140,7 +142,11 @@ esp_err_t settings_manager_set_volume(uint8_t vol) {
 esp_err_t settings_manager_set_pomodoro_work(uint32_t secs) {
   user_settings_t upd = cached_settings;
   upd.pomodoro.work_duration_s = secs;
-  return settings_manager_set(&upd);
+  esp_err_t err = settings_manager_set(&upd);
+  if (err == ESP_OK) {
+    apply_pomodoro_settings(&cached_settings.pomodoro);
+  }
+  return err;
 }
 
 /* ------------------------------------------------------------------ */
@@ -235,9 +241,11 @@ esp_err_t settings_manager_apply_from_cloud(const user_settings_t *s, uint32_t c
   s_sync_count      = cloud_count;
   s_needs_cloud_push = false;
 
-  // Apply audio/pomodoro subsystems — safe from any task
+  // Apply audio — safe from any task.
+  // Pomodoro period is intentionally NOT applied here: the Firestore fetch
+  // does not carry work_duration, and calling apply_pomodoro_settings would
+  // overwrite the user's current in-RAM period selection every sync cycle.
   apply_voice_settings(&cached_settings.voice);
-  apply_pomodoro_settings(&cached_settings.pomodoro);
 
   // Defer NVS write to an internal-RAM task (firebase_task stack is in PSRAM)
   s_cloud_pending_settings = cached_settings;

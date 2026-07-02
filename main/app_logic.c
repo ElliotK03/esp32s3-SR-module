@@ -17,6 +17,20 @@
 #include <string.h>
 #include <time.h>
 
+// Staging variable in DRAM so the NVS write task can safely read it
+// even if the LVGL task (PSRAM stack) that set it has moved on.
+static DRAM_ATTR uint32_t s_pending_period_sec = 0;
+
+static void save_period_to_nvs_task(void *arg) {
+    settings_manager_set_pomodoro_work(s_pending_period_sec);
+    vTaskDelete(NULL);
+}
+
+static void persist_period(uint32_t secs) {
+    s_pending_period_sec = secs;
+    xTaskCreate(save_period_to_nvs_task, "save_period_nvs", 3000, NULL, 5, NULL);
+}
+
 static void (*g_persist_brightness_cb)(int32_t) = NULL;
 static void (*g_lock_cb)(void) = NULL;
 static void (*g_unlock_cb)(void) = NULL;
@@ -79,8 +93,6 @@ static QueueHandle_t pomo_worker_queue = NULL;
 // ── Locker box sequence ───────────────────────────────────────────────────
 #define LOCKER_INSERT_WAIT_MS   5000   // ms to wait for user to insert phone
 #define LOCKER_PROMPT_FLASH_MS  400    // ms per flash toggle during wait
-
-static uint32_t s_pending_work_duration_sec = 0;
 
 // ============= Variable Storage =============
 static int32_t timer_arc_value = 0;
@@ -629,6 +641,12 @@ void start_timer(uint32_t duration_seconds) {
     pomodoro.mode = POMO_STATE_WORKING;
     pomodoro.has_added_5_min = false;
 
+    // Persist the confirmed period so it survives reboot.
+    // Skip the 5-second debug value — only save real minutes.
+    if (duration_seconds >= 60) {
+        persist_period(duration_seconds);
+    }
+
     // Restore arc indicator color to default
     if (objects.obj0 != NULL) {
         lv_obj_remove_local_style_prop(objects.obj0, LV_STYLE_ARC_COLOR, LV_PART_INDICATOR | LV_STATE_DEFAULT);
@@ -849,11 +867,11 @@ void action_button_plus_pressed(lv_event_t * e) {
     }
     
     if (pomo_tim_period_sec == 5) {
-        pomo_tim_period_sec = 5 * 60; // From 5 seconds back to 5 minutes
+        pomo_tim_period_sec = 5 * 60;
         update_pomo_period_display();
         ESP_LOGI(TAG, "Pomo period increased to %"PRIu32" minutes", pomo_tim_period_sec / 60);
-    } else if (pomo_tim_period_sec + 5 * 60 <= 60 * 60) {  // max 60 minutes
-        pomo_tim_period_sec += 5 * 60;  // increment by 5 minutes
+    } else if (pomo_tim_period_sec + 5 * 60 <= 60 * 60) {
+        pomo_tim_period_sec += 5 * 60;
         update_pomo_period_display();
         ESP_LOGI(TAG, "Pomo period increased to %"PRIu32" minutes", pomo_tim_period_sec / 60);
     }
@@ -871,8 +889,8 @@ void action_button_minus_pressed(lv_event_t * e) {
         return;
     }
     
-    if (pomo_tim_period_sec > 5 * 60) {  // min 5 minutes
-        pomo_tim_period_sec -= 5 * 60;  // decrement by 5 minutes
+    if (pomo_tim_period_sec > 5 * 60) {
+        pomo_tim_period_sec -= 5 * 60;
         update_pomo_period_display();
         ESP_LOGI(TAG, "Pomo period decreased to %"PRIu32" minutes", pomo_tim_period_sec / 60);
     } else if (pomo_tim_period_sec == 5 * 60) {
