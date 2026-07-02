@@ -128,7 +128,6 @@
                   "type": "tabset",
                   "id": "#af60ef06-65c2-4a6e-947b-937200adf32e",
                   "weight": 0.7657992565055762,
-                  "selected": 2,
                   "enableClose": false,
                   "children": [
                     {
@@ -201,7 +200,7 @@
               "children": [
                 {
                   "type": "tab",
-                  "id": "#6726c7b1-0334-4128-ba08-dec2ce280439",
+                  "id": "#49dd46b3-e4b6-48a7-8306-69062b80a58b",
                   "name": "Clock",
                   "component": "editor",
                   "config": {
@@ -1122,9 +1121,7 @@
       "selectionFront": {},
       "selectionBack": {
         "0": {
-          "0": {
-            "$selected": true
-          },
+          "0": {},
           "1": {}
         }
       },
@@ -1155,7 +1152,7 @@
           "x": -160,
           "y": -360
         },
-        "scale": 2.5
+        "scale": 1.75
       },
       "timeline": {
         "isEditorActive": false,

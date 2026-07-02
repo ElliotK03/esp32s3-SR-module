@@ -596,6 +596,14 @@ static void firestore_push_device_settings(void) {
     const user_settings_t *s = settings_manager_get();
     uint32_t sync_count = settings_manager_get_sync_count();
 
+    ESP_LOGI(TAG, "[PUSH] Uploading local state → cloud | sync_count=%" PRIu32
+             " lock=%s vol=%" PRIu8 " bright=%" PRId32 " override=%s",
+             sync_count,
+             s->locked ? "LOCKED" : "UNLOCKED",
+             s->voice.volume,
+             s->brightness,
+             s->lock_manual_override ? "ON" : "OFF");
+
     char device_id[18];
     get_device_id(device_id, sizeof(device_id));
 
@@ -643,18 +651,21 @@ static void firestore_push_device_settings(void) {
     if (err == ESP_OK) {
         int status = esp_http_client_get_status_code(client);
         if (status >= 200 && status < 300) {
-            ESP_LOGI(TAG, "Device settings push ✓ (count=%" PRIu32 ")", sync_count);
+            ESP_LOGI(TAG, "[PUSH] ✓ HTTP %d | sync_count=%" PRIu32 " now in cloud", status, sync_count);
             settings_manager_clear_cloud_push();
         } else {
-            ESP_LOGE(TAG, "Device settings push ✗ HTTP %d", status);
+            ESP_LOGE(TAG, "[PUSH] ✗ HTTP %d | sync_count=%" PRIu32 " NOT uploaded", status, sync_count);
         }
     } else {
-        ESP_LOGE(TAG, "Device settings push failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "[PUSH] ✗ transport error: %s", esp_err_to_name(err));
     }
     esp_http_client_cleanup(client);
 }
 
 static void firestore_fetch_device_settings(void) {
+    uint32_t local_count_before = settings_manager_get_sync_count();
+    ESP_LOGI(TAG, "[FETCH] Polling cloud | local_sync_count=%" PRIu32, local_count_before);
+
     char device_id[18];
     get_device_id(device_id, sizeof(device_id));
 
@@ -689,16 +700,25 @@ static void firestore_fetch_device_settings(void) {
             if (root) {
                 cJSON *fields = cJSON_GetObjectItem(root, "fields");
                 if (fields) {
-                    // Read cloud sync_count
+                    // Read cloud sync_count. The Android app writes numeric
+                    // Firestore fields as doubleValue, so we must accept both
+                    // integerValue and doubleValue or the count reads back as 0
+                    // and cloud changes are never applied.
                     uint32_t cloud_count = 0;
                     cJSON *count_obj = cJSON_GetObjectItem(fields, "sync_count");
                     if (count_obj) {
                         cJSON *iv = cJSON_GetObjectItem(count_obj, "integerValue");
-                        if (iv && cJSON_IsString(iv))      cloud_count = (uint32_t)atol(iv->valuestring);
+                        cJSON *dv = cJSON_GetObjectItem(count_obj, "doubleValue");
+                        if      (iv && cJSON_IsString(iv)) cloud_count = (uint32_t)atol(iv->valuestring);
                         else if (iv && cJSON_IsNumber(iv)) cloud_count = (uint32_t)iv->valuedouble;
+                        else if (dv && cJSON_IsNumber(dv)) cloud_count = (uint32_t)dv->valuedouble;
                     }
 
                     uint32_t local_count = settings_manager_get_sync_count();
+
+                    ESP_LOGI(TAG, "[FETCH] cloud_count=%" PRIu32 "  local_count=%" PRIu32 "  → %s",
+                             cloud_count, local_count,
+                             cloud_count > local_count ? "APPLYING CLOUD" : "local is authoritative, skip");
 
                     if (cloud_count > local_count) {
                         // Cloud is newer — build a new settings struct from cloud values
@@ -719,18 +739,22 @@ static void firestore_fetch_device_settings(void) {
                         cJSON *vol_obj = cJSON_GetObjectItem(fields, "speaker_volume");
                         if (vol_obj) {
                             cJSON *iv = cJSON_GetObjectItem(vol_obj, "integerValue");
+                            cJSON *dv = cJSON_GetObjectItem(vol_obj, "doubleValue");
                             int vol = -1;
-                            if (iv && cJSON_IsString(iv))      vol = atoi(iv->valuestring);
+                            if      (iv && cJSON_IsString(iv)) vol = atoi(iv->valuestring);
                             else if (iv && cJSON_IsNumber(iv)) vol = (int)iv->valuedouble;
+                            else if (dv && cJSON_IsNumber(dv)) vol = (int)dv->valuedouble;
                             if (vol >= 0 && vol <= 100) new_s.voice.volume = (uint8_t)vol;
                         }
 
                         cJSON *bright_obj = cJSON_GetObjectItem(fields, "screen_brightness");
                         if (bright_obj) {
                             cJSON *iv = cJSON_GetObjectItem(bright_obj, "integerValue");
+                            cJSON *dv = cJSON_GetObjectItem(bright_obj, "doubleValue");
                             int bright = -1;
-                            if (iv && cJSON_IsString(iv))      bright = atoi(iv->valuestring);
+                            if      (iv && cJSON_IsString(iv)) bright = atoi(iv->valuestring);
                             else if (iv && cJSON_IsNumber(iv)) bright = (int)iv->valuedouble;
+                            else if (dv && cJSON_IsNumber(dv)) bright = (int)dv->valuedouble;
                             if (bright >= 0 && bright <= 100) new_s.brightness = bright;
                         }
 
@@ -740,9 +764,13 @@ static void firestore_fetch_device_settings(void) {
                             if (bv && cJSON_IsBool(bv)) new_s.lock_manual_override = cJSON_IsTrue(bv);
                         }
 
+                        ESP_LOGI(TAG, "[FETCH] Applying — lock=%s vol=%" PRIu8 " bright=%" PRId32 " override=%s count=%" PRIu32,
+                                 new_s.locked ? "LOCKED" : "UNLOCKED",
+                                 new_s.voice.volume,
+                                 new_s.brightness,
+                                 new_s.lock_manual_override ? "ON" : "OFF",
+                                 cloud_count);
                         settings_manager_apply_from_cloud(&new_s, cloud_count);
-                        ESP_LOGI(TAG, "Cloud settings applied (cloud=%" PRIu32 " > local=%" PRIu32 ")",
-                                 cloud_count, local_count);
                     }
                     // local_count >= cloud_count: local is authoritative, no action here
                 }
@@ -771,22 +799,28 @@ static void firebase_task(void *arg) {
             continue;
         }
 
-        // On first connection push local state so cloud reflects device
-        if (!initial_sync_done) {
-            settings_manager_signal_cloud_push();
-            initial_sync_done = true;
-        }
-
         blink_count++;
         firestore_push_blink(blink_count, true);
 
-        // Push local changes to cloud before fetching, so we don't immediately overwrite them
-        if (settings_manager_needs_cloud_push()) {
-            firestore_push_device_settings();
-        }
+        if (!initial_sync_done) {
+            ESP_LOGI(TAG, "[SYNC] First connect — fetching cloud before any push");
+            firestore_fetch_device_settings();
+            initial_sync_done = true;
+            ESP_LOGI(TAG, "[SYNC] Initial fetch done | local_sync_count=%" PRIu32
+                     "  dirty=%s", settings_manager_get_sync_count(),
+                     settings_manager_needs_cloud_push() ? "yes" : "no");
+        } else {
+            ESP_LOGI(TAG, "[SYNC] Cycle | local_sync_count=%" PRIu32 "  dirty=%s",
+                     settings_manager_get_sync_count(),
+                     settings_manager_needs_cloud_push() ? "yes" : "no");
+            firestore_fetch_device_settings();
 
-        // Poll cloud; applies cloud settings only if cloud_count > local_count
-        firestore_fetch_device_settings();
+            if (settings_manager_needs_cloud_push()) {
+                firestore_push_device_settings();
+            } else {
+                ESP_LOGI(TAG, "[SYNC] No local changes to push");
+            }
+        }
 
         vTaskDelay(pdMS_TO_TICKS(5000));
     }

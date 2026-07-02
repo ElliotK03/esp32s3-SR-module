@@ -4,6 +4,10 @@
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_helper.h"
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "misc/lv_async.h"
 #include <inttypes.h>
 
 static const char *TAG = "SETTINGS_MGR";
@@ -206,24 +210,42 @@ void settings_manager_signal_cloud_push(void) {
   s_needs_cloud_push = true;
 }
 
+// Staging area for the deferred NVS write — must be in internal RAM.
+static DRAM_ATTR user_settings_t s_cloud_pending_settings;
+static DRAM_ATTR uint32_t        s_cloud_pending_count;
+
+static void cloud_apply_nvs_task(void *arg) {
+    (void)arg;
+    write_settings_to_nvs(&s_cloud_pending_settings);
+    nvs_write_sync_count(s_cloud_pending_count);
+    vTaskDelete(NULL);
+}
+
+static void cloud_apply_lvgl_cb(void *arg) {
+    (void)arg;
+    set_var_volume(cached_settings.voice.volume);
+    set_var_screen_brightness_val(cached_settings.brightness);
+}
+
 esp_err_t settings_manager_apply_from_cloud(const user_settings_t *s, uint32_t cloud_count) {
   if (!s) return ESP_ERR_INVALID_ARG;
 
-  esp_err_t err = write_settings_to_nvs((user_settings_t *)s);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "NVS write failed during cloud apply: %s", esp_err_to_name(err));
-    return err;
-  }
-
-  cached_settings = *s;
-  s_sync_count = cloud_count;
-  nvs_write_sync_count(cloud_count);
+  // Update cache immediately — safe from any task
+  cached_settings   = *s;
+  s_sync_count      = cloud_count;
   s_needs_cloud_push = false;
 
+  // Apply audio/pomodoro subsystems — safe from any task
   apply_voice_settings(&cached_settings.voice);
   apply_pomodoro_settings(&cached_settings.pomodoro);
-  set_var_volume(cached_settings.voice.volume);
-  set_var_screen_brightness_val(cached_settings.brightness);
+
+  // Defer NVS write to an internal-RAM task (firebase_task stack is in PSRAM)
+  s_cloud_pending_settings = cached_settings;
+  s_cloud_pending_count    = cloud_count;
+  xTaskCreate(cloud_apply_nvs_task, "cloud_nvs", 3000, NULL, 5, NULL);
+
+  // Defer LVGL variable updates to the LVGL task
+  lv_async_call(cloud_apply_lvgl_cb, NULL);
 
   ESP_LOGI(TAG, "Cloud settings applied (sync_count=%" PRIu32 ")", cloud_count);
   return ESP_OK;
