@@ -541,6 +541,7 @@ void app_main() {
     // Initiate audio pipeline
 #if ENABLE_AUDIO_SR
     audio_sr_init();
+    set_input_sensitivity(30);  // Mic gain 0–30; raise if wake word misses, lower if false triggers
 #endif
 
     // Allocate display task into PSRAM
