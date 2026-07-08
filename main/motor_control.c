@@ -18,6 +18,7 @@ static const char *TAG_MOTOR = "motor";
 #define MOTOR_RUN_MS          1500         // Maximum run time in ms
 #define MOTOR_SAMPLE_MS       200          // Current sampling interval in ms
 #define MOTOR_OVERCURRENT_MA  32.0f        // Stop threshold in mA
+#define MOTOR_REVERSE_DIR     1            // Set to 1 to swap lock/unlock directions
 
 static mcpwm_cmpr_handle_t cmp_m_a_h, cmp_m_a_l, cmp_m_b_h, cmp_m_b_l;
 static mcpwm_gen_handle_t gen_m_a_h, gen_m_a_l, gen_m_b_h, gen_m_b_l;
@@ -136,7 +137,8 @@ static void motor_run_timer_task(void *pvParameters) {
     int dir = (int)pvParameters; // 1 = CW (lock), 2 = CCW (unlock)
     const char *dir_str = (dir == 1) ? "CW (Lock)" : "CCW (Unlock)";
     ESP_LOGI(TAG_MOTOR, "Turning motor %s at %d%% speed...", dir_str, MOTOR_SPEED_PERCENT);
-    if (dir == 1) {
+    bool lock_is_cw = (MOTOR_REVERSE_DIR == 0);
+    if ((dir == 1) == lock_is_cw) {
         motor_turn_cw(MOTOR_DUTY);
     } else {
         motor_turn_ccw(MOTOR_DUTY);
