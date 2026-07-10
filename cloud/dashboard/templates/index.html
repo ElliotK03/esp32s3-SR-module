@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lock-In · Pomodoro Insights</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --border:   #334155;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --green:    #22c55e;
+      --red:      #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: .5px; }
+    header h1 span { color: var(--morning); }
+    .badge { background: var(--border); color: var(--muted); font-size: .75rem; padding: 3px 10px; border-radius: 99px; }
+    .spacer { flex: 1; }
+    select#deviceSelect {
+      background: var(--border); color: var(--text); border: none;
+      padding: 6px 12px; border-radius: 6px; font-size: .9rem; cursor: pointer;
+    }
+    button#runBtn {
+      background: var(--green); color: #000; font-weight: 700;
+      border: none; padding: 7px 18px; border-radius: 6px; cursor: pointer; font-size: .9rem;
+      transition: opacity .15s;
+    }
+    button#runBtn:disabled { opacity: .5; cursor: default; }
+    #statusLine { font-size: .8rem; color: var(--muted); }
+
+    /* ── Main layout ── */
+    main { padding: 24px; max-width: 1300px; margin: 0 auto; }
+
+    /* ── Meta bar ── */
+    #metaBar {
+      display: flex; gap: 24px; flex-wrap: wrap;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 20px; margin-bottom: 24px;
+      font-size: .85rem; color: var(--muted);
+    }
+    #metaBar span strong { color: var(--text); }
+
+    /* ── Cluster cards ── */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px; position: relative; overflow: hidden;
+    }
+    .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--cluster-color, var(--border)); }
+
+    .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .card-icon { font-size: 1.6rem; }
+    .card-title { font-size: 1rem; font-weight: 700; }
+    .card-count { margin-left: auto; font-size: .8rem; color: var(--muted); }
+
+    .stat { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .88rem; }
+    .stat:last-child { border-bottom: none; }
+    .stat-label { color: var(--muted); }
+    .stat-value { font-weight: 600; }
+    .morning  .stat-value { color: var(--morning); }
+    .afternoon.stat-value { color: var(--afternoon); }
+    .evening  .stat-value { color: var(--evening); }
+
+    /* ── Charts ── */
+    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 800px) { .charts { grid-template-columns: 1fr; } }
+    .chart-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+    }
+    .chart-box h3 { font-size: .9rem; color: var(--muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: .5px; }
+    .chart-box canvas { max-height: 280px; }
+
+    /* ── Empty / error state ── */
+    #emptyState {
+      text-align: center; padding: 60px 20px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    }
+    #emptyState p { color: var(--muted); margin-top: 12px; }
+    #emptyState .big { font-size: 3rem; margin-bottom: 8px; }
+
+    .hidden { display: none !important; }
+    .loading { color: var(--muted); font-size: .9rem; text-align: center; padding: 40px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Lock-<span>In</span> · Pomodoro Insights</h1>
+  <div class="spacer"></div>
+  <select id="deviceSelect"><option value="">Loading…</option></select>
+  <button id="runBtn" onclick="runPipeline()">▶ Run Pipeline</button>
+  <span id="statusLine">—</span>
+</header>
+
+<main>
+  <div id="loadingMsg" class="loading">Loading…</div>
+
+  <div id="emptyState" class="hidden">
+    <div class="big">🧠</div>
+    <h2>No insights yet</h2>
+    <p>Click <strong>▶ Run Pipeline</strong> to cluster your sessions.</p>
+  </div>
+
+  <div id="content" class="hidden">
+    <div id="metaBar">
+      <span>Device: <strong id="metaDevice">—</strong></span>
+      <span>Sessions used: <strong id="metaSessions">—</strong></span>
+      <span>Period: <strong id="metaRange">—</strong></span>
+      <span>Last run: <strong id="metaComputed">—</strong></span>
+      <span>Chosen K: <strong id="metaK">—</strong></span>
+      <span>Silhouette: <strong id="metaSil">—</strong></span>
+    </div>
+
+    <!-- Model info bar -->
+    <div id="modelBar" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 20px;margin-bottom:24px;font-size:.83rem;display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+      <span style="color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-size:.75rem">Model</span>
+      <span id="modelDetail" style="color:var(--muted)">—</span>
+    </div>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="charts">
+      <div class="chart-box">
+        <h3>Avg Work Duration by Cluster</h3>
+        <canvas id="barChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>Sessions — Hour vs Work Duration</h3>
+        <canvas id="scatterChart"></canvas>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  // Base label → colour/icon (suffix variants like "evening_2" match by prefix)
+  const PALETTE = {
+    morning:   '#f59e0b',
+    afternoon: '#3b82f6',
+    evening:   '#8b5cf6',
+    night:     '#0ea5e9',
+  };
+  const ICONS = {
+    morning:   '🌅',
+    afternoon: '☀️',
+    evening:   '🌙',
+    night:     '🌃',
+  };
+  function labelBase(l) { return l.replace(/_\d+$/, ''); }
+  function labelColor(l) { return PALETTE[labelBase(l)] || '#64748b'; }
+  function labelIcon(l)  { return ICONS[labelBase(l)]   || '🕐'; }
+
+  let barChart = null, scatterChart = null;
+  let currentDevice = null;
+
+  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  async function init() {
+    const devResp = await fetch('/api/devices');
+    const devData = await devResp.json();
+    const devices = devData.devices || [];
+
+    const sel = document.getElementById('deviceSelect');
+    sel.innerHTML = devices.map(d => `<option value="${d}">${d}</option>`).join('');
+    sel.addEventListener('change', () => loadInsights(sel.value));
+
+    if (devices.length > 0) {
+      currentDevice = devices[0];
+      await loadInsights(currentDevice);
+    } else {
+      showEmpty();
+    }
+  }
+
+  // ── Load insights ──────────────────────────────────────────────────────────
+  async function loadInsights(deviceId) {
+    currentDevice = deviceId;
+    show('loadingMsg'); hide('content'); hide('emptyState');
+
+    const resp = await fetch(`/api/insights/${deviceId}`);
+    hide('loadingMsg');
+
+    if (!resp.ok) { showEmpty(); return; }
+
+    const data = await resp.json();
+    if (data.error) { showEmpty(); return; }
+
+    renderMeta(deviceId, data);
+    renderCards(data.clusters || {});
+    renderBarChart(data.clusters || {});
+    renderScatter(data.session_points || []);
+
+    show('content');
+  }
+
+  // ── Meta bar ───────────────────────────────────────────────────────────────
+  function renderMeta(deviceId, data) {
+    document.getElementById('metaDevice').textContent   = deviceId;
+    document.getElementById('metaSessions').textContent = data.sessions_used ?? '—';
+    const dr = data.date_range || {};
+    document.getElementById('metaRange').textContent    = dr.from && dr.to ? `${dr.from} → ${dr.to}` : '—';
+    const ts = data.computed_at;
+    document.getElementById('metaComputed').textContent = ts ? new Date(ts).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) : '—';
+
+    const m = data.model || {};
+    document.getElementById('metaK').textContent   = m.chosen_k ?? '—';
+    document.getElementById('metaSil').textContent = m.best_silhouette != null ? m.best_silhouette.toFixed(3) : '—';
+
+    // Model detail bar: silhouette scores per K
+    const scores = m.silhouette_scores || {};
+    const parts  = Object.entries(scores)
+      .sort(([a], [b]) => +a - +b)
+      .map(([k, v]) => {
+        const chosen = +k === m.chosen_k;
+        return `<span style="padding:3px 10px;border-radius:99px;background:${chosen ? 'var(--green)' : 'var(--border)'};color:${chosen ? '#000' : 'var(--muted)'};font-weight:${chosen ? 700 : 400}">K=${k}: ${(+v).toFixed(3)}${chosen ? ' ✓' : ''}</span>`;
+      });
+    document.getElementById('modelDetail').innerHTML =
+      parts.length ? parts.join('&nbsp;') : 'No silhouette data';
+  }
+
+  // ── Cluster cards (dynamic — renders whatever labels the model returned) ────
+  function renderCards(clusters) {
+    const container = document.getElementById('cards');
+    container.innerHTML = '';
+
+    // Sort by centroid_hour so cards appear in chronological order
+    const sorted = Object.values(clusters).sort((a, b) => (a.centroid_hour ?? 0) - (b.centroid_hour ?? 0));
+
+    for (const c of sorted) {
+      const label = c.label || '?';
+      const color = labelColor(label);
+      const icon  = labelIcon(label);
+      const title = label.replace(/_/g, ' ').replace(/\b\w/g, x => x.toUpperCase());
+
+      container.innerHTML += `
+        <div class="card" style="--cluster-color:${color}">
+          <div class="card-header">
+            <span class="card-icon">${icon}</span>
+            <span class="card-title">${title}</span>
+            <span class="card-count">${c.session_count ?? 0} sessions</span>
+          </div>
+          ${c.session_count ? `
+          <div class="stat"><span class="stat-label">Avg start time</span>      <span class="stat-value" style="color:${color}">${c.avg_start_time ?? '—'}</span></div>
+          <div class="stat"><span class="stat-label">Avg total work</span>      <span class="stat-value" style="color:${color}">${c.avg_total_work_min ?? '—'} min</span></div>
+          <div class="stat"><span class="stat-label">Avg rest</span>            <span class="stat-value" style="color:${color}">${c.avg_total_rest_min ?? '—'} min</span></div>
+          <div class="stat"><span class="stat-label">Work per round</span>      <span class="stat-value" style="color:${color}">${c.avg_work_per_round_min ?? '—'} min</span></div>
+          <div class="stat"><span class="stat-label">Typical rounds</span>      <span class="stat-value" style="color:${color}">${c.mode_rounds ?? '—'} (mode)</span></div>
+          <div class="stat"><span class="stat-label">Avg rounds</span>          <span class="stat-value" style="color:${color}">${c.avg_rounds ?? '—'}</span></div>
+          ` : `<p style="color:var(--muted);font-size:.85rem">No sessions in this cluster.</p>`}
+        </div>`;
+    }
+  }
+
+  // ── Bar chart ──────────────────────────────────────────────────────────────
+  function renderBarChart(clusters) {
+    if (barChart) { barChart.destroy(); barChart = null; }
+
+    const sorted   = Object.values(clusters).sort((a, b) => (a.centroid_hour ?? 0) - (b.centroid_hour ?? 0));
+    const labels   = sorted.map(c => `${labelIcon(c.label)} ${c.label.replace(/_/g,' ')}`);
+    const workData = sorted.map(c => c.avg_total_work_min ?? 0);
+    const restData = sorted.map(c => c.avg_total_rest_min ?? 0);
+    const colors   = sorted.map(c => labelColor(c.label));
+
+    barChart = new Chart(document.getElementById('barChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Avg Work (min)', data: workData,  backgroundColor: colors.map(c => c + 'cc') },
+          { label: 'Avg Rest (min)', data: restData,  backgroundColor: colors.map(c => c + '44'), borderColor: colors, borderWidth: 1 },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#94a3b8' } } },
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, title: { display: true, text: 'minutes', color: '#94a3b8' } },
+        },
+      },
+    });
+  }
+
+  // ── Scatter chart ──────────────────────────────────────────────────────────
+  function renderScatter(points) {
+    if (scatterChart) { scatterChart.destroy(); scatterChart = null; }
+
+    // Derive unique cluster labels from the points themselves
+    const clusterLabels = [...new Set(points.map(p => p.cluster))].sort();
+    const datasets = clusterLabels.map(label => ({
+      label: label.replace(/_/g, ' ').replace(/\b\w/g, x => x.toUpperCase()),
+      data: points
+        .filter(p => p.cluster === label)
+        .map(p => ({ x: p.hour, y: p.total_work_min, meta: `${p.date} ${p.time}` })),
+      backgroundColor: labelColor(label) + 'bb',
+      pointRadius: 5,
+      pointHoverRadius: 7,
+    }));
+
+    scatterChart = new Chart(document.getElementById('scatterChart'), {
+      type: 'scatter',
+      data: { datasets },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: '#94a3b8' } },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const p = ctx.raw;
+                return `${p.meta}  |  work: ${p.y} min`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Hour of day', color: '#94a3b8' },
+            ticks: { color: '#94a3b8', callback: v => `${Math.floor(v)}:${String(Math.round((v%1)*60)).padStart(2,'0')}` },
+            grid: { color: '#334155' }, min: 0, max: 24,
+          },
+          y: {
+            title: { display: true, text: 'Total work (min)', color: '#94a3b8' },
+            ticks: { color: '#94a3b8' }, grid: { color: '#334155' },
+          },
+        },
+      },
+    });
+  }
+
+  // ── Run pipeline ───────────────────────────────────────────────────────────
+  async function runPipeline() {
+    const btn = document.getElementById('runBtn');
+    const status = document.getElementById('statusLine');
+    btn.disabled = true;
+    status.textContent = 'Running…';
+    status.style.color = '#f59e0b';
+
+    try {
+      const url = currentDevice ? `/api/run/${currentDevice}` : '/api/run';
+      const resp = await fetch(url, { method: 'POST' });
+      const data = await resp.json();
+
+      if (resp.ok && data.status === 'ok') {
+        status.textContent = '✓ Done';
+        status.style.color = '#22c55e';
+        await loadInsights(currentDevice);
+      } else {
+        status.textContent = '✗ ' + (data.error || data.message || 'error');
+        status.style.color = '#ef4444';
+      }
+    } catch (e) {
+      status.textContent = '✗ ' + e.message;
+      status.style.color = '#ef4444';
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => { status.textContent = '—'; status.style.color = ''; }, 5000);
+    }
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function show(id) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id) { document.getElementById(id)?.classList.add('hidden'); }
+  function showEmpty() { hide('loadingMsg'); hide('content'); show('emptyState'); }
+
+  init();
+</script>
+</body>
+</html>

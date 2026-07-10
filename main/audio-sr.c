@@ -7,6 +7,8 @@
 */
 
 #include "audio-sr.h"
+#include "screen_swipe.h"
+#include "misc/lv_async.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
@@ -27,6 +29,7 @@
 #include "esp_wn_iface.h"
 #include "model_path.h"
 #include "portmacro.h"
+#include "settings_manager.h"
 #include "speech_commands_action.h"
 #include <assert.h>
 
@@ -50,16 +53,7 @@ static esp_mn_iface_t *multinet;
 static model_iface_data_t *model_data;
 
 // include and wrapper for chime
-#include "chime.h"
-static void chime_wake_task(void *arg) {
-  chime_play_wake();
-  vTaskDelete(NULL);
-}
-
-static void chime_ack_task(void *arg) {
-  chime_play_ack();
-  vTaskDelete(NULL);
-}
+#include "app_logic.h"
 
 // Speech recognition tasks
 void feed_Task(void *arg) {
@@ -131,7 +125,8 @@ void detect_Task(void *arg) {
       if (res->wakeup_state == WAKENET_DETECTED) {
         ESP_LOGI("detect_Task", "WAKEWORD DETECTED");
         multinet->clean(model_data);
-        xTaskCreate(chime_wake_task, "chimeWake", 4096, NULL, 3, NULL);
+        app_play_chime(POMO_EV_PLAY_CHIME_WAKE);
+        lv_async_call((lv_async_cb_t)clock_ambient_brighten, NULL);
       }
 
       if (res->raw_data_channels == 1 &&
@@ -162,7 +157,7 @@ void detect_Task(void *arg) {
                 i + 1, mn_result->command_id[i], mn_result->phrase_id[i],
                 mn_result->string, mn_result->prob[i]);
           }
-          xTaskCreate(&chime_ack_task, "chimeAck", 1560, NULL, 3, NULL);
+          app_play_chime(POMO_EV_PLAY_CHIME_ACK);
           speech_commands_action(mn_result->command_id[0]);
           detect_flag = 1;
 
@@ -200,12 +195,14 @@ void detect_Task(void *arg) {
 
 // init speech recognition module
 void audio_sr_init() {
+  const user_settings_t *s = settings_manager_get();
   models =
       esp_srmodel_init("model"); // partition label defined in partitions.csv
+
   ESP_ERROR_CHECK(esp_board_init(16000, 2, 16));
   // ESP_ERROR_CHECK(esp_sdcard_init("/sdcard", 10));
 
-#if CONFIG_IDF_TARGET_ESP32
+  #if CONFIG_IDF_TARGET_ESP32
   printf("This demo only support ESP32S3\n");
   return;
 #else
@@ -218,25 +215,26 @@ void audio_sr_init() {
 
   task_flag = 1; // for speech detection task toggling
   static TaskHandle_t ledTaskHandle = NULL;
-  xTaskCreatePinnedToCore(&detect_Task, "detect", 8 * 1024, (void *)afe_data, 5,
-                          &detect_task_handle, 1);
-  xTaskCreatePinnedToCore(&feed_Task, "feed", 8 * 1024, (void *)afe_data, 5,
-                          &feed_task_handle, 0);
+  xTaskCreatePinnedToCore(&detect_Task, "detect", 3 * 1024, (void *)afe_data, 5,
+                          &detect_task_handle, 0);
+  xTaskCreatePinnedToCore(&feed_Task, "feed", 2 * 1024, (void *)afe_data, 5,
+                          &feed_task_handle, 1);
   if (LED_ENABLED) { // extern led_strip_handle_t strip;
     strip = configure_led();
     xTaskCreatePinnedToCore(&led_Task, "led", 1500, NULL, 5, &ledTaskHandle, 1);
   }
   int en = 0;
 
-  for (int k = 0; k < 3; k++) {
-    vTaskDelay(pdMS_TO_TICKS(8000));
-    UBaseType_t highWater = uxTaskGetStackHighWaterMark(ledTaskHandle);
-    ESP_LOGI("audio_sr_init()", "led task high‑water: %u bytes left",
-             (uint16_t)(highWater * sizeof(StackType_t)));
+  // vTaskDelay(pdMS_TO_TICKS(8000));
+  // UBaseType_t highWater = uxTaskGetStackHighWaterMark(ledTaskHandle);
+  // ESP_LOGI("audio_sr_init()", "led task high-water: %u bytes left",
+  //          (uint16_t)(highWater * sizeof(StackType_t)));
+  // en = ((task_flag + 1) % 2);
+  // voice_module_set_enabled(en);
 
-    // en = ((task_flag + 1) % 2);
-    // voice_module_set_enabled(en);
-  }
+  voice_module_set_enabled(s->voice.enabled);
+  set_output_vol(s->voice.volume);
+  multinet_set_detection_threshold(s->voice.wakenet_threshold);
 }
 
 // resume or suspend voice module

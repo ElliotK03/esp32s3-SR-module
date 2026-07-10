@@ -18,6 +18,10 @@ typedef struct {
 typedef struct {
     pomodoro_settings_t pomodoro;
     voice_settings_t    voice;
+    int32_t             brightness;
+    bool                locked;                  // true = LOCKED, false = UNLOCKED
+    bool                locker_box_connected;     // true = phone locker box addon present
+    bool                lock_manual_override;     // true = gray out manual lock/unlock buttons
 } user_settings_t;
 
 #define USER_SETTINGS_DEFAULT {                 \
@@ -32,4 +36,8 @@ typedef struct {
         .wakenet_threshold = 0.6f,              \
         .volume            = 70,                \
     },                                          \
+    .brightness = 80,                           \
+    .locked = false,                            \
+    .locker_box_connected = false,              \
+    .lock_manual_override = false,              \
 }

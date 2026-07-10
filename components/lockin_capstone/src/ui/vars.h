@@ -18,7 +18,19 @@ enum FlowGlobalVariables {
     FLOW_GLOBAL_VARIABLE_START_END_STR = 2,
     FLOW_GLOBAL_VARIABLE_CLCOK_STR = 3,
     FLOW_GLOBAL_VARIABLE_DATE_STR = 4,
-    FLOW_GLOBAL_VARIABLE_DAY_STR = 5
+    FLOW_GLOBAL_VARIABLE_DAY_STR = 5,
+    FLOW_GLOBAL_VARIABLE_WIFI_STATUS_STR = 6,
+    FLOW_GLOBAL_VARIABLE_SCREEN_BRIGHTNESS_VAL = 7,
+    FLOW_GLOBAL_VARIABLE_VOLUME = 8,
+    FLOW_GLOBAL_VARIABLE_SESSION_START_STOP_BUTTON_STR = 9,
+    FLOW_GLOBAL_VARIABLE_TIM_USER_TEXT_STR = 10,
+    FLOW_GLOBAL_VARIABLE_CURR_STREAK_STR = 11,
+    FLOW_GLOBAL_VARIABLE_START_POMO_CONTAINER_ENABLE = 12,
+    FLOW_GLOBAL_VARIABLE_POMO_RUNNING_CONTAINER_ENABLE = 13,
+    FLOW_GLOBAL_VARIABLE_PLUS_5_BUTTON_DISABLED = 14,
+    FLOW_GLOBAL_VARIABLE_POMO_RESTING_CONTAINER_ENABLE = 15,
+    FLOW_GLOBAL_VARIABLE_START_POMO_AGAIN_CONTAINER_ENABLE = 16,
+    FLOW_GLOBAL_VARIABLE_LOCK_MANUAL_OVERRIDE_ENABLED = 17
 };
 
 // Native global variables
@@ -31,14 +43,35 @@ extern const char *get_var_start_end_str();
 extern void set_var_start_end_str(const char *value);
 extern const char *get_var_clcok_str();
 extern void set_var_clcok_str(const char *value);
+extern const char *get_var_clock_seconds_str();
 extern const char *get_var_date_str();
 extern void set_var_date_str(const char *value);
 extern const char *get_var_day_str();
 extern void set_var_day_str(const char *value);
-extern int32_t get_var_screen_brightness();
-extern void set_var_screen_brightness(int32_t value);
+extern const char *get_var_wifi_status_str();
+extern void set_var_wifi_status_str(const char *value);
+extern int32_t get_var_screen_brightness_val();
+extern void set_var_screen_brightness_val(int32_t value);
 extern int32_t get_var_volume();
 extern void set_var_volume(int32_t value);
+extern const char *get_var_session_start_stop_button_str();
+extern void set_var_session_start_stop_button_str(const char *value);
+extern const char *get_var_tim_user_text_str();
+extern void set_var_tim_user_text_str(const char *value);
+extern const char *get_var_curr_streak_str();
+extern void set_var_curr_streak_str(const char *value);
+extern bool get_var_start_pomo_container_enable();
+extern void set_var_start_pomo_container_enable(bool value);
+extern bool get_var_pomo_running_container_enable();
+extern void set_var_pomo_running_container_enable(bool value);
+extern bool get_var_plus_5_button_disabled();
+extern void set_var_plus_5_button_disabled(bool value);
+extern bool get_var_pomo_resting_container_enable();
+extern void set_var_pomo_resting_container_enable(bool value);
+extern bool get_var_start_pomo_again_container_enable();
+extern void set_var_start_pomo_again_container_enable(bool value);
+extern bool get_var_lock_manual_override_enabled();
+extern void set_var_lock_manual_override_enabled(bool value);
 
 #ifdef __cplusplus
 }

@@ -37,6 +37,7 @@ idf_component_register(
     INCLUDE_DIRS
         "include"
         "boards/include"
+        "../../main/include"
     REQUIRES
         driver
         fatfs

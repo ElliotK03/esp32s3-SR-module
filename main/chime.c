@@ -34,3 +34,16 @@ void chime_play_wake(void) {
 void chime_play_ack(void) {
     play_note(880.00f, 150);  // A5
 }
+
+void chime_play_work_done(void) {
+    play_note(659.25f, 150); // E5
+    play_note(784.00f, 150); // G5
+    play_note(987.77f, 150); // B5
+    play_note(1318.51f, 300); // E6
+}
+
+void chime_play_rest_done(void) {
+    play_note(784.00f, 150); // G5
+    play_note(659.25f, 150); // E5
+    play_note(523.25f, 300); // C5
+}

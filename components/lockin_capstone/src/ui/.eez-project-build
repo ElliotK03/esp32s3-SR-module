@@ -11,6 +11,18 @@
     "styles.h",
     "ui.c",
     "ui.h",
+    "ui_image_brightness_bitmap.c",
+    "ui_image_ff_bitmap.c",
+    "ui_image_lock_bitmap.c",
+    "ui_image_minus_bitmap.c",
+    "ui_image_pause_bitmap.c",
+    "ui_image_play_arrow_bitmap.c",
+    "ui_image_plus_bitmap.c",
+    "ui_image_stop_bitmap.c",
+    "ui_image_unlock_24_px.c",
+    "ui_image_unlock_bitmap.c",
+    "ui_image_volume_bitmap.c",
+    "ui_image_wifi_bitmap.c",
     "vars.h"
   ]
 }

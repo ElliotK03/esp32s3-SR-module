@@ -18,6 +18,7 @@ set(requires
     cjson
     esp_http_server
     esp_http_client
+    esp-tls
     esp_driver_ledc
 )
 
@@ -30,10 +31,13 @@ set(srcs
     screen_swipe.c
     st7789.c 
     app_logic.c 
+    backlight.c
     connections.c
+    motor_control.c
+    settings_manager.c
+    ina226.c
 )
 
 idf_component_register(SRCS ${srcs}
                        REQUIRES ${requires}
-                       EMBED_TXTFILES "certs/google_root_ca.pem"
                        INCLUDE_DIRS "." "include")
